@@ -3,7 +3,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { loadConfig } from "./config.js";
-import { deleteValueByPath, flattenKeys, sortObjectKeys } from "./keys.js";
+import { deleteValueByPath, filterIgnoredKeys, flattenKeys, sortObjectKeys } from "./keys.js";
 import { writeLocaleFile } from "./parser.js";
 import { loadLocaleFiles } from "./scanner.js";
 import { translateMissingKeys } from "./translate.js";
@@ -52,7 +52,7 @@ program.command("missing").description("Find keys missing from non-source locale
     throw new Error(`Source locale "${config.sourceLocale}" was not found.`);
   }
 
-  const sourceKeys = flattenKeys(source.data);
+  const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
 
   for (const file of files.filter((candidate) => candidate.path !== source.path)) {
     const targetKeys = new Set(flattenKeys(file.data));
@@ -78,7 +78,7 @@ program.command("unused").description("Find translation keys not used in source 
   }
 
   const used = await findUsedKeys();
-  const unused = flattenKeys(source.data).filter((key) => !used.has(key));
+  const unused = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys).filter((key) => !used.has(key));
 
   if (unused.length === 0) {
     console.log(chalk.green("No unused keys found."));
@@ -91,8 +91,9 @@ program.command("unused").description("Find translation keys not used in source 
 program
   .command("remove-unused")
   .description("Remove unused translation keys from all locale files")
+  .option("--dry-run", "Preview changes without writing to disk")
   .option("--write", "Write changes to disk")
-  .action(async (options: { write?: boolean }) => {
+  .action(async (options: { dryRun?: boolean; write?: boolean }) => {
     const config = loadConfig();
     const files = await loadLocaleFiles();
     const source = files.find((file) => file.locale === config.sourceLocale);
@@ -102,7 +103,7 @@ program
     }
 
     const used = await findUsedKeys();
-    const unused = flattenKeys(source.data).filter((key) => !used.has(key));
+    const unused = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys).filter((key) => !used.has(key));
 
     if (unused.length === 0) {
       console.log(chalk.green("No unused keys found."));

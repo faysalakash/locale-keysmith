@@ -1,0 +1,6 @@
+{
+  "sourceLocale": "en",
+  "translationFiles": ["locales/*.{json,yml,yaml}"],
+  "src": ["src/**/*.{ts,tsx,js,jsx}"],
+  "ignoreKeys": []
+}

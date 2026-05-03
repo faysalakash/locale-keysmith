@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flattenKeys, sortObjectKeys } from "../src/keys.js";
+import { filterIgnoredKeys, flattenKeys, sortObjectKeys } from "../src/keys.js";
 
 describe("keys", () => {
   it("sorts nested keys", () => {
@@ -13,6 +13,12 @@ describe("keys", () => {
     expect(flattenKeys({ auth: { login: "Login" }, common: { save: "Save" } })).toEqual([
       "auth.login",
       "common.save"
+    ]);
+  });
+
+  it("filters ignored keys with wildcard patterns", () => {
+    expect(filterIgnoredKeys(["auth.login", "debug.trace", "debug.extra.deep"], ["debug.*"])).toEqual([
+      "auth.login"
     ]);
   });
 });

@@ -31,6 +31,12 @@ export function flattenKeys(value: LocaleObject, prefix = ""): string[] {
   });
 }
 
+export function filterIgnoredKeys(keys: string[], ignorePatterns: string[]): string[] {
+  if (ignorePatterns.length === 0) return keys;
+  const matchers = ignorePatterns.map(patternToRegExp);
+  return keys.filter((key) => !matchers.some((matcher) => matcher.test(key)));
+}
+
 export function getValueByPath(value: LocaleObject, path: string): LocaleValue | undefined {
   return path.split(".").reduce<LocaleValue | undefined>((current, segment) => {
     if (!isPlainObject(current)) return undefined;
@@ -56,16 +62,30 @@ export function setValueByPath(value: LocaleObject, path: string, nextValue: Loc
 export function deleteValueByPath(value: LocaleObject, path: string): void {
   const segments = path.split(".");
   let current: LocaleObject | undefined = value;
+  const parents: Array<{ object: LocaleObject; key: string }> = [];
 
   for (const segment of segments.slice(0, -1)) {
     const child: LocaleValue | undefined = current[segment];
     if (!isPlainObject(child)) return;
+    parents.push({ object: current, key: segment });
     current = child;
   }
 
   delete current[segments.at(-1) as string];
+
+  for (const parent of parents.reverse()) {
+    const child = parent.object[parent.key];
+    if (isPlainObject(child) && Object.keys(child).length === 0) {
+      delete parent.object[parent.key];
+    }
+  }
 }
 
 function isPlainObject(value: unknown): value is LocaleObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function patternToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
+  return new RegExp(`^${escaped}$`);
 }

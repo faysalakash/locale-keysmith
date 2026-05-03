@@ -1,0 +1,13 @@
+{
+  "common": {
+    "zebra": "Zebra",
+    "save": "Save"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout"
+  },
+  "unused": {
+    "old": "Old text"
+  }
+}

@@ -11,12 +11,12 @@ pnpm add -D locale-keysmith
 ## Commands
 
 ```bash
-npx locale-keysmith scan
-npx locale-keysmith sort --write
-npx locale-keysmith missing
-npx locale-keysmith unused
-npx locale-keysmith remove-unused --dry-run
-npx locale-keysmith translate --from en --to de,fr --write
+pnpm exec locale-keysmith scan
+pnpm exec locale-keysmith sort --write
+pnpm exec locale-keysmith missing
+pnpm exec locale-keysmith unused
+pnpm exec locale-keysmith remove-unused --dry-run
+pnpm exec locale-keysmith translate --from en --to de,fr --write
 ```
 
 ## Config
@@ -41,18 +41,19 @@ Set a Google Translate API key before running the `translate` command:
 
 ```bash
 export GOOGLE_TRANSLATE_API_KEY="your-api-key"
-npx locale-keysmith translate --from en --to de --write
+pnpm exec locale-keysmith translate --from en --to de --write
 ```
 
 ## Publish
 
+Validate without publishing:
+
 ```bash
 pnpm run check
-pnpm pack --dry-run
-pnpm publish
+pnpm publish --dry-run --access public --no-git-checks
 ```
 
-For scoped public packages:
+Publish from a clean `main` branch:
 
 ```bash
 pnpm publish --access public
