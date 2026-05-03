@@ -12,7 +12,7 @@ import { findUsedKeys } from "./usage.js";
 const program = new Command();
 
 program
-  .name("lingo-keysmith")
+  .name("locale-keysmith")
   .description("Sort, audit, clean, and translate locale files")
   .version("0.1.0");
 

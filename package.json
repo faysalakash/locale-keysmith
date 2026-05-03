@@ -1,11 +1,11 @@
 {
-  "name": "lingo-keysmith",
+  "name": "locale-keysmith",
   "version": "0.1.0",
   "description": "CLI helper for sorting, auditing, cleaning, and translating i18n locale keys.",
   "type": "module",
   "packageManager": "pnpm@10.4.0",
   "bin": {
-    "lingo-keysmith": "./dist/cli.js"
+    "locale-keysmith": "./dist/cli.js"
   },
   "exports": {
     ".": {

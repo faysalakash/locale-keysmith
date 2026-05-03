@@ -14,7 +14,7 @@ const defaultConfig: LocaleLintConfig = {
 };
 
 export function loadConfig(cwd = process.cwd()): LocaleLintConfig {
-  const path = join(cwd, "lingo-keysmith.config.json");
+  const path = join(cwd, "locale-keysmith.config.json");
   if (!existsSync(path)) return defaultConfig;
 
   const userConfig = JSON.parse(readFileSync(path, "utf8")) as Partial<LocaleLintConfig>;

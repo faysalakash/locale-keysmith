@@ -1,27 +1,27 @@
-# lingo-keysmith
+# locale-keysmith
 
 Sort, audit, clean, and translate locale files from the command line.
 
 ## Install
 
 ```bash
-pnpm add -D lingo-keysmith
+pnpm add -D locale-keysmith
 ```
 
 ## Commands
 
 ```bash
-npx lingo-keysmith scan
-npx lingo-keysmith sort --write
-npx lingo-keysmith missing
-npx lingo-keysmith unused
-npx lingo-keysmith remove-unused --dry-run
-npx lingo-keysmith translate --from en --to de,fr --write
+npx locale-keysmith scan
+npx locale-keysmith sort --write
+npx locale-keysmith missing
+npx locale-keysmith unused
+npx locale-keysmith remove-unused --dry-run
+npx locale-keysmith translate --from en --to de,fr --write
 ```
 
 ## Config
 
-Create `lingo-keysmith.config.json` in your project:
+Create `locale-keysmith.config.json` in your project:
 
 ```json
 {
@@ -41,7 +41,7 @@ Set a Google Translate API key before running the `translate` command:
 
 ```bash
 export GOOGLE_TRANSLATE_API_KEY="your-api-key"
-npx lingo-keysmith translate --from en --to de --write
+npx locale-keysmith translate --from en --to de --write
 ```
 
 ## Publish
