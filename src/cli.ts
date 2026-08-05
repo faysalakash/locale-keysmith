@@ -24,6 +24,7 @@ program
 
     if (files.length === 0) {
       console.log(chalk.yellow("No locale files found."));
+
       return;
     }
 
@@ -41,7 +42,11 @@ program
 
     for (const file of files) {
       file.data = sortObjectKeys(file.data);
-      if (options.write) writeLocaleFile(file);
+
+      if (options.write) {
+        writeLocaleFile(file);
+      }
+
       console.log(`${options.write ? "sorted" : "would sort"} ${file.path}`);
     }
   });
@@ -56,7 +61,9 @@ program
     const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
 
     for (const file of files) {
-      if (file.path === source.path) continue;
+      if (file.path === source.path) {
+        continue;
+      }
 
       const missing = missingKeysFor(sourceKeys, file);
       console.log(chalk.bold(file.locale));
@@ -66,7 +73,9 @@ program
         continue;
       }
 
-      for (const key of missing) console.log(`  ${key}`);
+      for (const key of missing) {
+        console.log(`  ${key}`);
+      }
     }
   });
 
@@ -81,10 +90,13 @@ program
 
     if (unused.length === 0) {
       console.log(chalk.green("No unused keys found."));
+
       return;
     }
 
-    for (const key of unused) console.log(key);
+    for (const key of unused) {
+      console.log(key);
+    }
   });
 
 program
@@ -105,19 +117,26 @@ program
 
     const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
     for (const file of files) {
-      if (file.path === source.path) continue;
+      if (file.path === source.path) {
+        continue;
+      }
 
       const missing = missingKeysFor(sourceKeys, file);
-      for (const key of missing) console.log(`${chalk.red("missing")} ${file.locale} ${key}`);
+      for (const key of missing) {
+        console.log(`${chalk.red("missing")} ${file.locale} ${key}`);
+      }
       issues += missing.length;
     }
 
     const unused = await findUnusedKeys(source, config.ignoreKeys);
-    for (const key of unused) console.log(`${chalk.red("unused")} ${key}`);
+    for (const key of unused) {
+      console.log(`${chalk.red("unused")} ${key}`);
+    }
     issues += unused.length;
 
     if (issues === 0) {
       console.log(chalk.green("All locale files are healthy."));
+
       return;
     }
 
@@ -138,13 +157,19 @@ program
 
     if (unused.length === 0) {
       console.log(chalk.green("No unused keys found."));
+
       return;
     }
 
     for (const file of files) {
-      for (const key of unused) deleteValueByPath(file.data, key);
+      for (const key of unused) {
+        deleteValueByPath(file.data, key);
+      }
       file.data = sortObjectKeys(file.data);
-      if (options.write) writeLocaleFile(file);
+
+      if (options.write) {
+        writeLocaleFile(file);
+      }
     }
 
     console.log(`${options.write ? "removed" : "would remove"} ${unused.length} unused keys`);
@@ -168,7 +193,9 @@ program
     );
 
     for (const locale of targetLocales) {
-      if (locale === source.locale) continue;
+      if (locale === source.locale) {
+        continue;
+      }
 
       const target = files.find((file) => file.locale === locale) ?? createEmptyLocaleFile(source, locale);
       const missing = missingKeysFor(sourceKeys, target);
@@ -202,17 +229,23 @@ program.parseAsync().catch((error: unknown) => {
 
 function requireSourceLocale(files: LocaleFile[], locale: string): LocaleFile {
   const source = files.find((file) => file.locale === locale);
-  if (!source) throw new Error(`Source locale "${locale}" was not found.`);
+
+  if (!source) {
+    throw new Error(`Source locale "${locale}" was not found.`);
+  }
+
   return source;
 }
 
 function missingKeysFor(sourceKeys: string[], target: LocaleFile): string[] {
   const present = new Set(flattenKeys(target.data));
+
   return sourceKeys.filter((key) => !present.has(key));
 }
 
 async function findUnusedKeys(source: LocaleFile, ignoreKeys: string[]): Promise<string[]> {
   const used = await findUsedKeys();
+
   return filterIgnoredKeys(flattenKeys(source.data), ignoreKeys).filter((key) => !used.has(key));
 }
 

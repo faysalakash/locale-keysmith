@@ -8,6 +8,7 @@ export function readLocaleFile(path: string): LocaleFile {
   const raw = readFileSync(path, "utf8");
 
   let parsed: unknown = {};
+
   if (raw.trim() !== "") {
     try {
       parsed = format === "json" ? JSON.parse(raw) : YAML.parse(raw);
@@ -36,5 +37,6 @@ export function writeLocaleFile(file: LocaleFile): void {
 
 export function inferLocale(path: string): string {
   const filename = path.split(/[\\/]/).at(-1) ?? "";
+
   return filename.replace(/\.(json|ya?ml)$/i, "");
 }

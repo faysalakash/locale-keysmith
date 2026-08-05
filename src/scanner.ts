@@ -9,5 +9,6 @@ export async function findLocaleFiles(cwd = process.cwd()): Promise<string[]> {
 
 export async function loadLocaleFiles(cwd = process.cwd()): Promise<LocaleFile[]> {
   const paths = await findLocaleFiles(cwd);
+
   return paths.map(readLocaleFile);
 }
