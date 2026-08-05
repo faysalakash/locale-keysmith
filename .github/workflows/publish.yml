@@ -22,8 +22,7 @@ jobs:
           node-version-file: .tool-versions
           registry-url: "https://registry.npmjs.org"
           cache: pnpm
-      # Trusted publishing requires npm >= 11.5.1.
-      - run: npm install -g npm@latest
+      # The pinned Node ships npm >= 11.5.1, which is required for OIDC trusted publishing.
       - run: pnpm install --frozen-lockfile
       # No token needed: npm authenticates via the workflow's OIDC identity,
       # which must be registered as a Trusted Publisher on the npm package.
