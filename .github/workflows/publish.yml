@@ -11,6 +11,9 @@ jobs:
     # "chore: release v0.2.0" PR) or when triggered manually.
     if: "${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore: release') }}"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm OIDC trusted publishing
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -19,9 +22,10 @@ jobs:
           node-version-file: .tool-versions
           registry-url: "https://registry.npmjs.org"
           cache: pnpm
+      # Trusted publishing requires npm >= 11.5.1.
+      - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
-      # `npm publish` runs the `prepublishOnly` check (lint + format + build + test)
-      # before publishing, so the release is gated on a green build.
+      # No token needed: npm authenticates via the workflow's OIDC identity,
+      # which must be registered as a Trusted Publisher on the npm package.
+      # `npm publish` runs the prepublishOnly check (lint + format + build + test) first.
       - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
