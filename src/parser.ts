@@ -1,13 +1,21 @@
 import { extname } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 import YAML from "yaml";
-import type { LocaleFile, LocaleObject } from "./types.js";
+import type { LocaleFile, LocaleObject } from "@/types";
 
 export function readLocaleFile(path: string): LocaleFile {
-  const extension = extname(path).toLowerCase();
+  const format: LocaleFile["format"] = extname(path).toLowerCase() === ".json" ? "json" : "yaml";
   const raw = readFileSync(path, "utf8");
-  const format = extension === ".json" ? "json" : "yaml";
-  const parsed = format === "json" ? JSON.parse(raw) : YAML.parse(raw);
+
+  let parsed: unknown = {};
+  if (raw.trim() !== "") {
+    try {
+      parsed = format === "json" ? JSON.parse(raw) : YAML.parse(raw);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to parse ${path}: ${detail}`, { cause: error });
+    }
+  }
 
   return {
     path,
