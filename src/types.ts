@@ -13,6 +13,7 @@ export interface LocaleFile {
 
 export interface LocaleLintConfig {
   sourceLocale: string;
+  roots: string[];
   translationFiles: string[];
   src: string[];
   ignoreKeys: string[];

@@ -1,15 +1,10 @@
-import fg from "fast-glob";
-import { loadConfig } from "./config.js";
-import { readLocaleFile } from "./parser.js";
-import type { LocaleFile } from "./types.js";
+import { CONFIG_FILENAME, loadConfig } from "@/config";
+import { globFiles } from "@/glob";
+import { readLocaleFile } from "@/parser";
+import type { LocaleFile } from "@/types";
 
 export async function findLocaleFiles(cwd = process.cwd()): Promise<string[]> {
-  const config = loadConfig(cwd);
-  return fg(config.translationFiles, {
-    cwd,
-    absolute: true,
-    ignore: ["**/node_modules/**", "**/dist/**", "**/.next/**"]
-  });
+  return globFiles(loadConfig(cwd).translationFiles, cwd, [`**/${CONFIG_FILENAME}`]);
 }
 
 export async function loadLocaleFiles(cwd = process.cwd()): Promise<LocaleFile[]> {

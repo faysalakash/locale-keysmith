@@ -1,28 +1,41 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { LocaleLintConfig } from "./types.js";
+import type { LocaleLintConfig } from "@/types";
 
-const defaultConfig: LocaleLintConfig = {
-  sourceLocale: "en",
-  translationFiles: [
-    "**/locales/**/*.{json,yml,yaml}",
-    "**/i18n/**/*.{json,yml,yaml}",
-    "**/translations/**/*.{json,yml,yaml}"
-  ],
-  src: ["src/**/*.{ts,tsx,js,jsx,vue,svelte}"],
-  ignoreKeys: []
-};
+export const CONFIG_FILENAME = "locale-keysmith.config.json";
+
+export const LOCALE_EXTENSIONS = ["json", "yml", "yaml"];
+
+export const SOURCE_EXTENSIONS = ["ts", "tsx", "js", "jsx", "mjs", "cjs", "vue", "svelte"];
+
+const DEFAULT_ROOTS = ["src"];
+
+function rootGlob(root: string, extensions: string[]): string {
+  const clean = root.replace(/^\.\/+/, "").replace(/\/+$/, "");
+  const prefix = clean === "" || clean === "." ? "" : `${clean}/`;
+  return `${prefix}**/*.{${extensions.join(",")}}`;
+}
 
 export function loadConfig(cwd = process.cwd()): LocaleLintConfig {
-  const path = join(cwd, "locale-keysmith.config.json");
-  if (!existsSync(path)) return defaultConfig;
+  const userConfig = readUserConfig(join(cwd, CONFIG_FILENAME));
+  const roots = userConfig.roots ?? DEFAULT_ROOTS;
 
-  const userConfig = JSON.parse(readFileSync(path, "utf8")) as Partial<LocaleLintConfig>;
+  return structuredClone({
+    sourceLocale: userConfig.sourceLocale ?? "en",
+    roots,
+    translationFiles: userConfig.translationFiles ?? roots.map((root) => rootGlob(root, LOCALE_EXTENSIONS)),
+    src: userConfig.src ?? roots.map((root) => rootGlob(root, SOURCE_EXTENSIONS)),
+    ignoreKeys: userConfig.ignoreKeys ?? []
+  });
+}
 
-  return {
-    sourceLocale: userConfig.sourceLocale ?? defaultConfig.sourceLocale,
-    translationFiles: userConfig.translationFiles ?? defaultConfig.translationFiles,
-    src: userConfig.src ?? defaultConfig.src,
-    ignoreKeys: userConfig.ignoreKeys ?? defaultConfig.ignoreKeys
-  };
+function readUserConfig(path: string): Partial<LocaleLintConfig> {
+  if (!existsSync(path)) return {};
+
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as Partial<LocaleLintConfig>;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse ${CONFIG_FILENAME}: ${detail}`, { cause: error });
+  }
 }
