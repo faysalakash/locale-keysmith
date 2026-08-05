@@ -1,4 +1,8 @@
-import type { LocaleObject, LocaleValue } from "./types.js";
+import type { LocaleObject, LocaleValue } from "@/types";
+
+export function isSorted(value: LocaleObject): boolean {
+  return JSON.stringify(value) === JSON.stringify(sortObjectKeys(value));
+}
 
 export function sortObjectKeys<T extends LocaleValue>(value: T): T {
   if (Array.isArray(value)) {
