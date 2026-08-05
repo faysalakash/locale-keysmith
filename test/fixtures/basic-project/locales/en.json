@@ -1,13 +1,41 @@
 {
-  "common": {
-    "zebra": "Zebra",
+  "app": {
+    "title": "Nebula",
+    "tagline": "Notes that orbit your ideas",
+    "menuLabel": "Open menu"
+  },
+  "status": {
+    "online": "Online",
+    "offline": "Offline"
+  },
+  "banner": {
+    "welcome": "Welcome aboard"
+  },
+  "priority": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High"
+  },
+  "tag": {
+    "work": "Work",
+    "personal": "Personal",
+    "urgent": "Urgent"
+  },
+  "footer": {
+    "copyright": "© Nebula"
+  },
+  "action": {
     "save": "Save"
   },
-  "auth": {
-    "login": "Login",
-    "logout": "Logout"
+  "theme": {
+    "dark": "Dark",
+    "light": "Light"
   },
-  "unused": {
-    "old": "Old text"
+  "legacy": {
+    "oldButton": "Old button",
+    "deprecatedTooltip": "No longer used"
+  },
+  "draft": {
+    "placeholder": "Start writing…"
   }
 }
