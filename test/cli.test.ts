@@ -16,6 +16,7 @@ const tsxPath = join(repoRoot, "node_modules", ".bin", "tsx");
 async function createProjectCopy(fixture = "basic-project"): Promise<string> {
   const project = await mkdtemp(join(tmpdir(), "locale-keysmith-"));
   await cp(join(fixturesPath, fixture), project, { recursive: true });
+
   return project;
 }
 
@@ -26,6 +27,7 @@ async function runCli(cwd: string, ...args: string[]): Promise<string> {
       cwd,
       env: { ...process.env, TSX_TSCONFIG_PATH: tsconfigPath }
     });
+
     return result.stdout;
   } catch (error) {
     // Commands like `health` exit non-zero when they find issues; keep their stdout.

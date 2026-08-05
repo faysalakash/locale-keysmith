@@ -8,6 +8,7 @@ async function writeTemp(name: string, content: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "lk-parser-"));
   const path = join(dir, name);
   await writeFile(path, content);
+
   return path;
 }
 

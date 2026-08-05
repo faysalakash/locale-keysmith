@@ -25,13 +25,18 @@ export async function findUsedKeys(cwd = process.cwd()): Promise<Set<string>> {
 export function collectUsedKeys(content: string, used = new Set<string>()): Set<string> {
   for (const pattern of callPatterns) {
     for (const match of content.matchAll(pattern)) {
-      if (match[1] && !match[1].includes("${")) used.add(match[1]);
+      if (match[1] && !match[1].includes("${")) {
+        used.add(match[1]);
+      }
     }
   }
 
   for (const match of content.matchAll(stringLiteralPattern)) {
     const literal = match[2];
-    if (keyShape.test(literal)) used.add(literal);
+
+    if (keyShape.test(literal)) {
+      used.add(literal);
+    }
   }
 
   return used;

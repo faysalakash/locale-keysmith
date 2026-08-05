@@ -13,6 +13,7 @@ const DEFAULT_ROOTS = ["src"];
 function rootGlob(root: string, extensions: string[]): string {
   const clean = root.replace(/^\.\/+/, "").replace(/\/+$/, "");
   const prefix = clean === "" || clean === "." ? "" : `${clean}/`;
+
   return `${prefix}**/*.{${extensions.join(",")}}`;
 }
 
@@ -30,7 +31,9 @@ export function loadConfig(cwd = process.cwd()): LocaleLintConfig {
 }
 
 function readUserConfig(path: string): Partial<LocaleLintConfig> {
-  if (!existsSync(path)) return {};
+  if (!existsSync(path)) {
+    return {};
+  }
 
   try {
     return JSON.parse(readFileSync(path, "utf8")) as Partial<LocaleLintConfig>;

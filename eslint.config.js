@@ -14,7 +14,14 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "@typescript-eslint/consistent-type-imports": "error",
       eqeqeq: ["error", "always"],
-      "no-console": "off"
+      "no-console": "off",
+      curly: ["error", "all"],
+      "padding-line-between-statements": [
+        "error",
+        { blankLine: "always", prev: "*", next: "return" },
+        { blankLine: "always", prev: "*", next: "if" },
+        { blankLine: "always", prev: "if", next: "*" }
+      ]
     }
   }
 );

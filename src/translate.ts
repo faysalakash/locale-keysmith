@@ -8,6 +8,7 @@ export async function translateMissingKeys(options: {
   keys: string[];
 }): Promise<number> {
   const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
+
   if (!apiKey) {
     throw new Error("GOOGLE_TRANSLATE_API_KEY is required for the translate command.");
   }
@@ -16,7 +17,10 @@ export async function translateMissingKeys(options: {
 
   for (const key of options.keys) {
     const sourceValue = getValueByPath(options.source.data, key);
-    if (typeof sourceValue !== "string" || sourceValue.trim() === "") continue;
+
+    if (typeof sourceValue !== "string" || sourceValue.trim() === "") {
+      continue;
+    }
 
     const translated = await translateText(sourceValue, options.targetLanguage, apiKey);
     setValueByPath(options.target.data, key, translated);
