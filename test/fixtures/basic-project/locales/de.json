@@ -1,8 +1,33 @@
 {
-  "common": {
+  "app": {
+    "title": "Nebula",
+    "tagline": "Notizen, die um deine Ideen kreisen",
+    "menuLabel": "Menü öffnen"
+  },
+  "status": {
+    "online": "Online"
+  },
+  "banner": {
+    "welcome": "Willkommen an Bord"
+  },
+  "priority": {
+    "low": "Niedrig",
+    "medium": "Mittel",
+    "high": "Hoch"
+  },
+  "tag": {
+    "work": "Arbeit",
+    "personal": "Persönlich",
+    "urgent": "Dringend"
+  },
+  "footer": {
+    "copyright": "© Nebula"
+  },
+  "action": {
     "save": "Speichern"
   },
-  "auth": {
-    "login": "Anmelden"
+  "theme": {
+    "dark": "Dunkel",
+    "light": "Hell"
   }
 }
