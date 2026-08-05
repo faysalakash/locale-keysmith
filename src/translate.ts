@@ -1,5 +1,5 @@
-import { getValueByPath, setValueByPath } from "./keys.js";
-import type { LocaleFile, LocaleValue } from "./types.js";
+import { getValueByPath, setValueByPath } from "@/keys";
+import type { LocaleFile, LocaleValue } from "@/types";
 
 export async function translateMissingKeys(options: {
   source: LocaleFile;
