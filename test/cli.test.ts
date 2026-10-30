@@ -36,6 +36,21 @@ async function runCli(cwd: string, ...args: string[]): Promise<string> {
 }
 
 describe("cli", () => {
+  it("starts with a node shebang so npm's bin link can execute it", async () => {
+    const source = await readFile(cliPath, "utf8");
+
+    expect(source.startsWith("#!/usr/bin/env node\n")).toBe(true);
+  });
+
+  it("reports the version from package.json", async () => {
+    const { version } = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8")) as {
+      version: string;
+    };
+    const output = await runCli(repoRoot, "--version");
+
+    expect(output.trim()).toBe(version);
+  });
+
   it("scans locale files", async () => {
     const project = await createProjectCopy();
     const output = await runCli(project, "scan");

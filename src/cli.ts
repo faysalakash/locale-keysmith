@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+import { createRequire } from "node:module";
 import { dirname, extname, join } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
@@ -9,12 +11,15 @@ import { translateMissingKeys } from "@/translate";
 import type { LocaleFile } from "@/types";
 import { findUsedKeys } from "@/usage";
 
+// Resolves to the package root from both src/cli.ts (tsx) and dist/cli.js (published).
+const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
+
 const program = new Command();
 
 program
   .name("locale-keysmith")
   .description("Sort, audit, clean, and translate locale files")
-  .version("0.1.0");
+  .version(version);
 
 program
   .command("scan")
