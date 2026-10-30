@@ -9,7 +9,7 @@ import { writeLocaleFile } from "@/parser";
 import { loadLocaleFiles } from "@/scanner";
 import { translateMissingKeys } from "@/translate";
 import type { LocaleFile } from "@/types";
-import { findUsedKeys } from "@/usage";
+import { findKeyUsage, isKeyUsed } from "@/usage";
 
 // Resolves to the package root from both src/cli.ts (tsx) and dist/cli.js (published).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
@@ -183,6 +183,11 @@ program
       }
     }
 
+    // List every key so a deletion can be reviewed (and diffed against `unused`).
+    for (const key of unused) {
+      console.log(`  ${key}`);
+    }
+
     console.log(`${options.write ? "removed" : "would remove"} ${unused.length} unused keys`);
   });
 
@@ -255,9 +260,9 @@ function missingKeysFor(sourceKeys: string[], target: LocaleFile): string[] {
 }
 
 async function findUnusedKeys(source: LocaleFile, ignoreKeys: string[]): Promise<string[]> {
-  const used = await findUsedKeys();
+  const usage = await findKeyUsage();
 
-  return filterIgnoredKeys(flattenKeys(source.data), ignoreKeys).filter((key) => !used.has(key));
+  return filterIgnoredKeys(flattenKeys(source.data), ignoreKeys).filter((key) => !isKeyUsed(key, usage));
 }
 
 function createEmptyLocaleFile(source: LocaleFile, locale: string): LocaleFile {

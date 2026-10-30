@@ -1,0 +1,5 @@
+{
+  "sourceLocale": "en",
+  "translationFiles": ["locales/*.json"],
+  "src": ["src/**/*.tsx"]
+}

@@ -104,13 +104,12 @@ describe("cli", () => {
     expect(reported).toContain("legacy.deprecatedTooltip");
     expect(reported).toContain("draft.placeholder");
 
-    // ...as are keys reachable only through a dynamic `t(\`theme.${mode}\`)`,
-    // which cannot be resolved statically.
-    expect(reported).toContain("theme.dark");
-    expect(reported).toContain("theme.light");
+    // Keys under a dynamic `t(\`theme.${mode}\`)` prefix count as used, so they are never deleted.
+    expect(reported).not.toContain("theme.dark");
+    expect(reported).not.toContain("theme.light");
 
-    // Exactly the five unresolved keys, nothing more.
-    expect(reported).toHaveLength(5);
+    // Exactly the three unreferenced keys, nothing more.
+    expect(reported).toHaveLength(3);
   });
 
   it("sorts locale files when write is enabled", async () => {
@@ -138,7 +137,8 @@ describe("cli", () => {
     const output = await runCli(project, "remove-unused", "--dry-run");
     const en = await readFile(join(project, "locales", "en.json"), "utf8");
 
-    expect(output).toContain("would remove 5 unused keys");
+    expect(output).toContain("would remove 3 unused keys");
+    expect(output).toContain("  legacy.oldButton");
     expect(en).toContain('"legacy"');
   });
 
@@ -148,12 +148,31 @@ describe("cli", () => {
     const en = await readFile(join(project, "locales", "en.json"), "utf8");
     const de = await readFile(join(project, "locales", "de.json"), "utf8");
 
-    expect(output).toContain("removed 5 unused keys");
+    expect(output).toContain("removed 3 unused keys");
     expect(en).not.toContain('"legacy"');
     expect(en).not.toContain('"draft"');
-    expect(en).not.toContain('"theme"');
+    expect(en).toContain('"theme"');
     expect(en).toContain('"priority"');
-    expect(de).not.toContain('"theme"');
+    expect(de).not.toContain('"legacy"');
+  });
+
+  it("keeps plural, context, namespaced, dynamic and apostrophe-adjacent keys on remove-unused", async () => {
+    const project = await createProjectCopy("usage-edge-cases");
+    const output = await runCli(project, "remove-unused", "--write");
+    const en = JSON.parse(await readFile(join(project, "locales", "en.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+
+    expect(output).toContain("removed 1 unused keys");
+    expect(output).toContain("  unused.really");
+    expect(Object.keys(en)).toEqual(["cart", "common", "friend", "nav", "theme"]);
+    expect(en.cart).toEqual({
+      item_one: "{{count}} item",
+      item_other: "{{count}} items",
+      item_zero: "No items"
+    });
+    expect(en.nav).toEqual({ about: "About", home: "Home" });
   });
 
   it("previews translations for an existing target locale without an API key", async () => {

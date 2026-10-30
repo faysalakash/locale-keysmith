@@ -1,0 +1,25 @@
+{
+  "cart": {
+    "item_one": "{{count}} item",
+    "item_other": "{{count}} items",
+    "item_zero": "No items"
+  },
+  "common": {
+    "title": "Title"
+  },
+  "friend": {
+    "greeting_female": "Say hi to her",
+    "greeting_male": "Say hi to him"
+  },
+  "nav": {
+    "about": "About",
+    "home": "Home"
+  },
+  "theme": {
+    "dark": "Dark",
+    "light": "Light"
+  },
+  "unused": {
+    "really": "Nobody references this"
+  }
+}
