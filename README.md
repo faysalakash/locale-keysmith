@@ -172,6 +172,10 @@ set either explicitly, which overrides the derived globs:
 | `src`              | `<root>/**/*.{ts,tsx,js,jsx,mjs,cjs,vue,svelte}` per root | Globs for source files (overrides the derived globs). |
 | `ignoreKeys`       | `[]`                                                      | Key patterns excluded from audits (`*` wildcard).     |
 
+The config is checked before any command runs. Wrong types (`"roots": "src"` instead of
+`["src"]`), a `sourceLocale` that is not a locale code, and unknown fields (with a "did you
+mean" hint for typos) are all reported together.
+
 `node_modules`, `dist`, and `.next` are always ignored.
 
 ### How locale files are recognised
