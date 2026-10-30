@@ -23,6 +23,10 @@ describe("sortObjectKeys", () => {
     });
   });
 
+  it("uses a fixed, case-insensitive-first collation regardless of the runtime locale", () => {
+    expect(Object.keys(sortObjectKeys({ b: 1, B: 2, a: 3, A: 4, ä: 5 }))).toEqual(["a", "A", "ä", "b", "B"]);
+  });
+
   it("returns primitives unchanged", () => {
     expect(sortObjectKeys("hello")).toBe("hello");
     expect(sortObjectKeys(42)).toBe(42);
@@ -70,6 +74,11 @@ describe("getValueByPath", () => {
   it("returns undefined for missing paths", () => {
     expect(getValueByPath({ a: {} }, "a.b.c")).toBeUndefined();
   });
+
+  it("reads keys that themselves contain dots", () => {
+    expect(getValueByPath({ "a.b": "flat" }, "a.b")).toBe("flat");
+    expect(getValueByPath({ a: { "b.c": "mixed" } }, "a.b.c")).toBe("mixed");
+  });
 });
 
 describe("setValueByPath", () => {
@@ -83,6 +92,12 @@ describe("setValueByPath", () => {
     const target = { a: "scalar" };
     setValueByPath(target, "a.b", "x");
     expect(target).toEqual({ a: { b: "x" } });
+  });
+
+  it("updates an existing key that contains dots instead of nesting a duplicate", () => {
+    const target = { "a.b": "old" };
+    setValueByPath(target, "a.b", "new");
+    expect(target).toEqual({ "a.b": "new" });
   });
 });
 
@@ -103,5 +118,12 @@ describe("deleteValueByPath", () => {
     const target = { a: { b: "x" } };
     deleteValueByPath(target, "a.z.y");
     expect(target).toEqual({ a: { b: "x" } });
+  });
+
+  it("deletes keys that themselves contain dots", () => {
+    const target = { "a.b": "x", nested: { "c.d": "y", keep: "z" } };
+    deleteValueByPath(target, "a.b");
+    deleteValueByPath(target, "nested.c.d");
+    expect(target).toEqual({ nested: { keep: "z" } });
   });
 });

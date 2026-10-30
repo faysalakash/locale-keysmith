@@ -9,6 +9,8 @@ export interface LocaleFile {
   locale: string;
   format: "json" | "yaml";
   data: LocaleObject;
+  /** File contents as last read or written; used to keep indentation and YAML comments on write. */
+  original?: string;
 }
 
 export interface LocaleLintConfig {
