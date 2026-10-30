@@ -8,6 +8,8 @@ Sort, audit, clean, and translate i18n locale files from the command line.
 pnpm add -D locale-keysmith
 ```
 
+Requires Node.js 22.12 or newer.
+
 ## Quick start
 
 ```bash
