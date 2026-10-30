@@ -111,15 +111,25 @@ pnpm exec locale-keysmith translate --from en --to de,fr --write
 ```
 
 Translates the source locale's missing keys into each target locale using the Google
-Translate API. A target locale that has no file yet is created next to the source file.
+Translate API. A target locale that has no file yet is created next to the source file. Keys
+matching `ignoreKeys` are not translated.
 
-| Option            | Default | Description                                     |
-| ----------------- | ------- | ----------------------------------------------- |
-| `--to <locales>`  | —       | Comma-separated target locales (required).      |
-| `--from <locale>` | `en`    | Source locale to translate from.                |
-| `--write`         | off     | Write results to disk (otherwise preview only). |
+| Option            | Default                 | Description                                     |
+| ----------------- | ----------------------- | ----------------------------------------------- |
+| `--to <locales>`  | —                       | Comma-separated target locales (required).      |
+| `--from <locale>` | `sourceLocale` (config) | Source locale to translate from.                |
+| `--write`         | off                     | Write results to disk (otherwise preview only). |
 
-Requires the `GOOGLE_TRANSLATE_API_KEY` environment variable.
+Requires the `GOOGLE_TRANSLATE_API_KEY` environment variable; it is sent in a request header,
+never in the URL.
+
+- **Placeholders are protected.** `{{name}}`, `{count}`, ICU messages such as
+  `{count, plural, ...}`, `<0>…</0>` and other tags, `$t(key)` and `%s` are passed through
+  untranslated. If a translation comes back with a placeholder missing, that key is skipped
+  with a warning rather than written broken. (The text inside an ICU message is kept as is.)
+- **Progress is saved.** If a request fails midway, the keys translated so far are written
+  before the error is reported, so rerunning only translates what is left.
+- Keys are sent in batches of up to 100 strings per request.
 
 ## Configuration
 

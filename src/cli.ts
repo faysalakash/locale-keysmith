@@ -10,6 +10,7 @@ import { localeFilePath } from "@/locale-path";
 import { groupLocaleFiles, loadLocaleFiles } from "@/scanner";
 import type { LocaleGroup } from "@/scanner";
 import { translateMissingKeys } from "@/translate";
+import type { TranslationResult } from "@/translate";
 import type { LocaleFile } from "@/types";
 import { findKeyUsage, isKeyUsed } from "@/usage";
 import type { KeyUsage } from "@/usage";
@@ -220,10 +221,11 @@ program
   .command("translate")
   .description("Translate missing keys from the source locale")
   .requiredOption("--to <locales>", "Comma-separated target locales")
-  .option("--from <locale>", "Source locale", "en")
+  .option("--from <locale>", "Source locale (default: sourceLocale from the config)")
   .option("--write", "Write changes to disk")
-  .action(async (options: { to: string; from: string; write?: boolean }) => {
-    const groups = await loadGroups(options.from);
+  .action(async (options: { to: string; from?: string; write?: boolean }) => {
+    const config = loadConfig();
+    const groups = await loadGroups(options.from ?? config.sourceLocale);
     const targetLocales = new Set(
       options.to
         .split(",")
@@ -232,7 +234,7 @@ program
     );
 
     for (const { source, targets } of groups) {
-      const sourceKeys = flattenKeys(source.data);
+      const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
 
       for (const locale of targetLocales) {
         if (locale === source.locale) {
@@ -254,15 +256,36 @@ program
           continue;
         }
 
-        const changed = await translateMissingKeys({
-          source,
-          target,
-          targetLanguage: locale,
-          keys: missing
-        });
-        target.data = sortObjectKeys(target.data);
-        writeLocaleFile(target);
-        console.log(`${name}: translated ${changed} keys`);
+        // Saves whatever has been translated so far; also runs when a request fails midway,
+        // so a rerun only has to translate the remaining keys.
+        const save = (): number => {
+          const translated = missing.length - missingKeysFor(missing, target).length;
+
+          if (translated > 0) {
+            target.data = sortObjectKeys(target.data);
+            writeLocaleFile(target);
+          }
+
+          return translated;
+        };
+
+        let result: TranslationResult;
+
+        try {
+          result = await translateMissingKeys({ source, target, targetLanguage: locale, keys: missing });
+        } catch (error) {
+          console.log(`${name}: saved ${save()} translated keys before the error`);
+          throw error;
+        }
+
+        save();
+        console.log(`${name}: translated ${result.translated} keys`);
+
+        for (const key of result.skipped) {
+          console.warn(
+            chalk.yellow(`${name}: skipped ${key} (the translation did not keep its placeholders)`)
+          );
+        }
       }
     }
   });
