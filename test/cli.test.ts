@@ -221,4 +221,62 @@ describe("cli", () => {
 
     expect(output).toContain("All locale files are healthy.");
   });
+
+  it("never touches JSON files that are not locale files", async () => {
+    const project = await createProjectCopy();
+    const config = '{\n  "zeta": 1,\n  "apiUrl": "https://example.com"\n}\n';
+    await mkdir(join(project, "src", "data"), { recursive: true });
+    await writeFile(join(project, "src", "data", "config.json"), config);
+    await writeFile(
+      join(project, "locale-keysmith.config.json"),
+      JSON.stringify({ sourceLocale: "en", roots: ["."] })
+    );
+
+    const scan = await runCli(project, "scan");
+    await runCli(project, "sort", "--write");
+    await runCli(project, "remove-unused", "--write");
+
+    expect(scan).not.toContain("config.json");
+    expect(scan).not.toContain("package.json");
+    expect(await readFile(join(project, "src", "data", "config.json"), "utf8")).toBe(config);
+  });
+
+  it("compares each set of translations with its own source file", async () => {
+    const project = await mkdtemp(join(tmpdir(), "locale-keysmith-"));
+    const files: Record<string, string> = {
+      "locale-keysmith.config.json": JSON.stringify({ roots: ["app", "plugin"] }),
+      "app/locales/en.json": '{ "app": { "title": "App" } }',
+      "app/locales/de.json": '{ "app": { "title": "App" } }',
+      "plugin/locales/en.json": '{ "plugin": { "name": "Plugin" } }',
+      "plugin/locales/de.json": "{}",
+      "app/src/main.ts": 't("app.title"); t("plugin.name");'
+    };
+
+    for (const [path, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(project, path)), { recursive: true });
+      await writeFile(join(project, path), contents);
+    }
+
+    const output = await runCli(project, "health");
+
+    // The app's de.json is complete; only the plugin's de.json misses its key.
+    expect(output).toContain(`missing de (${join("plugin", "locales", "de.json")}) plugin.name`);
+    expect(output).not.toContain("missing de (app");
+    expect(output).toContain("1 issue found.");
+  });
+
+  it("translates namespaced files into the matching locale directory", async () => {
+    const project = await mkdtemp(join(tmpdir(), "locale-keysmith-"));
+    await mkdir(join(project, "public", "locales", "en"), { recursive: true });
+    await writeFile(join(project, "locale-keysmith.config.json"), JSON.stringify({ roots: ["public"] }));
+    await writeFile(join(project, "public", "locales", "en", "common.json"), '{ "a": { "b": "x" } }');
+    await writeFile(join(project, "public", "locales", "en", "home.json"), '{ "c": { "d": "y" } }');
+
+    const output = await runCli(project, "translate", "--to", "fr");
+
+    expect(output).toContain(
+      `fr (${join("public", "locales", "fr", "common.json")}): would translate 1 keys`
+    );
+    expect(output).toContain(`fr (${join("public", "locales", "fr", "home.json")}): would translate 1 keys`);
+  });
 });

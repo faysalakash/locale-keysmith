@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 import { createRequire } from "node:module";
-import { dirname, extname, join } from "node:path";
+import { relative } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
 import { loadConfig } from "@/config";
 import { deleteValueByPath, filterIgnoredKeys, flattenKeys, isSorted, sortObjectKeys } from "@/keys";
 import { writeLocaleFile } from "@/parser";
-import { loadLocaleFiles } from "@/scanner";
+import { localeFilePath } from "@/locale-path";
+import { groupLocaleFiles, loadLocaleFiles } from "@/scanner";
+import type { LocaleGroup } from "@/scanner";
 import { translateMissingKeys } from "@/translate";
 import type { LocaleFile } from "@/types";
 import { findKeyUsage, isKeyUsed } from "@/usage";
+import type { KeyUsage } from "@/usage";
 
 // Resolves to the package root from both src/cli.ts (tsx) and dist/cli.js (published).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
@@ -67,25 +70,23 @@ program
   .description("Find keys missing from non-source locales")
   .action(async () => {
     const config = loadConfig();
-    const files = await loadLocaleFiles();
-    const source = requireSourceLocale(files, config.sourceLocale);
-    const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
+    const groups = await loadGroups(config.sourceLocale);
 
-    for (const file of files) {
-      if (file.path === source.path) {
-        continue;
-      }
+    for (const { source, targets } of groups) {
+      const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
 
-      const missing = missingKeysFor(sourceKeys, file);
-      console.log(chalk.bold(file.locale));
+      for (const file of targets) {
+        const missing = missingKeysFor(sourceKeys, file);
+        console.log(chalk.bold(label(file, groups)));
 
-      if (missing.length === 0) {
-        console.log(chalk.green("  no missing keys"));
-        continue;
-      }
+        if (missing.length === 0) {
+          console.log(chalk.green("  no missing keys"));
+          continue;
+        }
 
-      for (const key of missing) {
-        console.log(`  ${key}`);
+        for (const key of missing) {
+          console.log(`  ${key}`);
+        }
       }
     }
   });
@@ -95,18 +96,25 @@ program
   .description("Find translation keys not used in source files")
   .action(async () => {
     const config = loadConfig();
-    const files = await loadLocaleFiles();
-    const source = requireSourceLocale(files, config.sourceLocale);
-    const unused = await findUnusedKeys(source, config.ignoreKeys);
+    const groups = await loadGroups(config.sourceLocale);
+    const usage = await findKeyUsage();
+    let total = 0;
 
-    if (unused.length === 0) {
-      console.log(chalk.green("No unused keys found."));
+    for (const { source } of groups) {
+      const unused = findUnusedKeys(source, config.ignoreKeys, usage);
+      total += unused.length;
 
-      return;
+      if (groups.length > 1 && unused.length > 0) {
+        console.log(chalk.bold(relative(process.cwd(), source.path)));
+      }
+
+      for (const key of unused) {
+        console.log(groups.length > 1 ? `  ${key}` : key);
+      }
     }
 
-    for (const key of unused) {
-      console.log(key);
+    if (total === 0) {
+      console.log(chalk.green("No unused keys found."));
     }
   });
 
@@ -115,8 +123,9 @@ program
   .description("Report missing keys, unused keys, and unsorted files (exits non-zero on any issue)")
   .action(async () => {
     const config = loadConfig();
-    const files = await loadLocaleFiles();
-    const source = requireSourceLocale(files, config.sourceLocale);
+    const groups = await loadGroups(config.sourceLocale);
+    const files = groups.flatMap((group) => [group.source, ...group.targets]);
+    const usage = await findKeyUsage();
 
     let issues = 0;
 
@@ -126,24 +135,25 @@ program
     }
     issues += unsorted.length;
 
-    const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
-    for (const file of files) {
-      if (file.path === source.path) {
-        continue;
+    for (const { source, targets } of groups) {
+      const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
+
+      for (const file of targets) {
+        const missing = missingKeysFor(sourceKeys, file);
+        for (const key of missing) {
+          console.log(`${chalk.red("missing")} ${label(file, groups)} ${key}`);
+        }
+        issues += missing.length;
       }
 
-      const missing = missingKeysFor(sourceKeys, file);
-      for (const key of missing) {
-        console.log(`${chalk.red("missing")} ${file.locale} ${key}`);
+      const unused = findUnusedKeys(source, config.ignoreKeys, usage);
+      for (const key of unused) {
+        console.log(
+          `${chalk.red("unused")} ${key}${groups.length > 1 ? ` (${relative(process.cwd(), source.path)})` : ""}`
+        );
       }
-      issues += missing.length;
+      issues += unused.length;
     }
-
-    const unused = await findUnusedKeys(source, config.ignoreKeys);
-    for (const key of unused) {
-      console.log(`${chalk.red("unused")} ${key}`);
-    }
-    issues += unused.length;
 
     if (issues === 0) {
       console.log(chalk.green("All locale files are healthy."));
@@ -162,33 +172,48 @@ program
   .option("--write", "Write changes to disk")
   .action(async (options: { dryRun?: boolean; write?: boolean }) => {
     const config = loadConfig();
-    const files = await loadLocaleFiles();
-    const source = requireSourceLocale(files, config.sourceLocale);
-    const unused = await findUnusedKeys(source, config.ignoreKeys);
+    const groups = await loadGroups(config.sourceLocale);
+    const usage = await findKeyUsage();
+    let total = 0;
 
-    if (unused.length === 0) {
+    for (const group of groups) {
+      const unused = findUnusedKeys(group.source, config.ignoreKeys, usage);
+
+      if (unused.length === 0) {
+        continue;
+      }
+
+      total += unused.length;
+
+      if (groups.length > 1) {
+        console.log(chalk.bold(relative(process.cwd(), group.source.path)));
+      }
+
+      // List every key so a deletion can be reviewed (and diffed against `unused`).
+      for (const key of unused) {
+        console.log(`  ${key}`);
+      }
+
+      // Only touch files that translate this source, never unrelated locale files.
+      for (const file of [group.source, ...group.targets]) {
+        for (const key of unused) {
+          deleteValueByPath(file.data, key);
+        }
+        file.data = sortObjectKeys(file.data);
+
+        if (options.write) {
+          writeLocaleFile(file);
+        }
+      }
+    }
+
+    if (total === 0) {
       console.log(chalk.green("No unused keys found."));
 
       return;
     }
 
-    for (const file of files) {
-      for (const key of unused) {
-        deleteValueByPath(file.data, key);
-      }
-      file.data = sortObjectKeys(file.data);
-
-      if (options.write) {
-        writeLocaleFile(file);
-      }
-    }
-
-    // List every key so a deletion can be reviewed (and diffed against `unused`).
-    for (const key of unused) {
-      console.log(`  ${key}`);
-    }
-
-    console.log(`${options.write ? "removed" : "would remove"} ${unused.length} unused keys`);
+    console.log(`${options.write ? "removed" : "would remove"} ${total} unused keys`);
   });
 
 program
@@ -198,9 +223,7 @@ program
   .option("--from <locale>", "Source locale", "en")
   .option("--write", "Write changes to disk")
   .action(async (options: { to: string; from: string; write?: boolean }) => {
-    const files = await loadLocaleFiles();
-    const source = requireSourceLocale(files, options.from);
-    const sourceKeys = flattenKeys(source.data);
+    const groups = await loadGroups(options.from);
     const targetLocales = new Set(
       options.to
         .split(",")
@@ -208,33 +231,39 @@ program
         .filter(Boolean)
     );
 
-    for (const locale of targetLocales) {
-      if (locale === source.locale) {
-        continue;
+    for (const { source, targets } of groups) {
+      const sourceKeys = flattenKeys(source.data);
+
+      for (const locale of targetLocales) {
+        if (locale === source.locale) {
+          continue;
+        }
+
+        const target =
+          targets.find((file) => file.locale === locale) ?? createEmptyLocaleFile(source, locale);
+        const name = label(target, groups);
+        const missing = missingKeysFor(sourceKeys, target);
+
+        if (missing.length === 0) {
+          console.log(chalk.green(`${name}: no missing keys`));
+          continue;
+        }
+
+        if (!options.write) {
+          console.log(`${name}: would translate ${missing.length} keys`);
+          continue;
+        }
+
+        const changed = await translateMissingKeys({
+          source,
+          target,
+          targetLanguage: locale,
+          keys: missing
+        });
+        target.data = sortObjectKeys(target.data);
+        writeLocaleFile(target);
+        console.log(`${name}: translated ${changed} keys`);
       }
-
-      const target = files.find((file) => file.locale === locale) ?? createEmptyLocaleFile(source, locale);
-      const missing = missingKeysFor(sourceKeys, target);
-
-      if (missing.length === 0) {
-        console.log(chalk.green(`${locale}: no missing keys`));
-        continue;
-      }
-
-      if (!options.write) {
-        console.log(`${locale}: would translate ${missing.length} keys`);
-        continue;
-      }
-
-      const changed = await translateMissingKeys({
-        source,
-        target,
-        targetLanguage: locale,
-        keys: missing
-      });
-      target.data = sortObjectKeys(target.data);
-      writeLocaleFile(target);
-      console.log(`${locale}: translated ${changed} keys`);
     }
   });
 
@@ -243,14 +272,30 @@ program.parseAsync().catch((error: unknown) => {
   process.exitCode = 1;
 });
 
-function requireSourceLocale(files: LocaleFile[], locale: string): LocaleFile {
-  const source = files.find((file) => file.locale === locale);
+type SourcedGroup = LocaleGroup & { source: LocaleFile };
 
-  if (!source) {
-    throw new Error(`Source locale "${locale}" was not found.`);
+/** Locale files grouped by what they translate; groups without a source file are skipped. */
+async function loadGroups(sourceLocale: string): Promise<SourcedGroup[]> {
+  const groups = groupLocaleFiles(await loadLocaleFiles(), sourceLocale);
+  const sourced = groups.filter((group): group is SourcedGroup => group.source !== undefined);
+
+  if (sourced.length === 0) {
+    throw new Error(`Source locale "${sourceLocale}" was not found.`);
   }
 
-  return source;
+  for (const group of groups) {
+    if (!group.source) {
+      const where = relative(process.cwd(), group.id);
+      console.warn(chalk.yellow(`skipped ${where}: no "${sourceLocale}" file to compare against`));
+    }
+  }
+
+  return sourced;
+}
+
+/** The locale, plus the file path when there is more than one group to tell apart. */
+function label(file: LocaleFile, groups: LocaleGroup[]): string {
+  return groups.length > 1 ? `${file.locale} (${relative(process.cwd(), file.path)})` : file.locale;
 }
 
 function missingKeysFor(sourceKeys: string[], target: LocaleFile): string[] {
@@ -259,15 +304,13 @@ function missingKeysFor(sourceKeys: string[], target: LocaleFile): string[] {
   return sourceKeys.filter((key) => !present.has(key));
 }
 
-async function findUnusedKeys(source: LocaleFile, ignoreKeys: string[]): Promise<string[]> {
-  const usage = await findKeyUsage();
-
+function findUnusedKeys(source: LocaleFile, ignoreKeys: string[], usage: KeyUsage): string[] {
   return filterIgnoredKeys(flattenKeys(source.data), ignoreKeys).filter((key) => !isKeyUsed(key, usage));
 }
 
 function createEmptyLocaleFile(source: LocaleFile, locale: string): LocaleFile {
   return {
-    path: join(dirname(source.path), `${locale}${extname(source.path)}`),
+    path: localeFilePath(source.path, locale),
     locale,
     format: source.format,
     data: {}

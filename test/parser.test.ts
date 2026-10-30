@@ -18,6 +18,10 @@ describe("inferLocale", () => {
     expect(inferLocale("/a/b/pt-BR.yaml")).toBe("pt-BR");
     expect(inferLocale("de.yml")).toBe("de");
   });
+
+  it("derives the locale from the directory for namespaced files", () => {
+    expect(inferLocale("/app/public/locales/pt-BR/common.json")).toBe("pt-BR");
+  });
 });
 
 describe("readLocaleFile", () => {
