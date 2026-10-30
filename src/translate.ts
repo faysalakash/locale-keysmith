@@ -1,3 +1,4 @@
+import { pluralFallbackKey } from "@/checks";
 import { getValueByPath, setValueByPath } from "@/keys";
 import type { LocaleFile } from "@/types";
 
@@ -38,7 +39,10 @@ export async function translateMissingKeys(options: {
   }
 
   const entries = options.keys.flatMap((key): Entry[] => {
-    const text = getValueByPath(options.source.data, key);
+    const fallback = pluralFallbackKey(key);
+    const text =
+      getValueByPath(options.source.data, key) ??
+      (fallback === undefined ? undefined : getValueByPath(options.source.data, fallback));
 
     return typeof text === "string" && text.trim() !== "" ? [{ key, text }] : [];
   });
