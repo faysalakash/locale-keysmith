@@ -37,6 +37,31 @@ Run a command with `pnpm exec locale-keysmith <command>` (or `npx locale-keysmit
 | `remove-unused`            | Delete unused keys from every locale file.                               |
 | `translate --to <locales>` | Fill missing keys in target locales via Google Translate.                |
 
+### Using it in CI
+
+`scan`, `missing`, `unused` and `health` accept `--json` and print a machine-readable
+result on stdout (warnings go to stderr, so stdout always parses):
+
+```bash
+pnpm exec locale-keysmith health --json
+```
+
+```json
+{
+  "healthy": false,
+  "issueCount": 1,
+  "issues": [{ "type": "missing", "file": "src/locales/de.json", "locale": "de", "key": "status.offline" }]
+}
+```
+
+Exit codes:
+
+| Code | Meaning                                                                           |
+| ---- | --------------------------------------------------------------------------------- |
+| `0`  | Nothing to report.                                                                |
+| `1`  | `missing`, `unused` or `health` found something.                                  |
+| `2`  | The command itself failed (invalid config, unreadable locale file, API error...). |
+
 ### `scan`
 
 ```bash

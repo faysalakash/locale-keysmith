@@ -35,6 +35,39 @@ async function runCli(cwd: string, ...args: string[]): Promise<string> {
   }
 }
 
+async function runCliWithStatus(
+  cwd: string,
+  ...args: string[]
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  try {
+    const result = await execFileAsync(tsxPath, [cliPath, ...args], {
+      cwd,
+      env: { ...process.env, TSX_TSCONFIG_PATH: tsconfigPath }
+    });
+
+    return { stdout: result.stdout, stderr: result.stderr, code: 0 };
+  } catch (error) {
+    const failed = error as { stdout?: string; stderr?: string; code?: number };
+
+    return { stdout: failed.stdout ?? "", stderr: failed.stderr ?? "", code: failed.code ?? -1 };
+  }
+}
+
+async function createHealthyProject(): Promise<string> {
+  const project = await mkdtemp(join(tmpdir(), "locale-keysmith-"));
+  await mkdir(join(project, "locales"), { recursive: true });
+  await mkdir(join(project, "src"), { recursive: true });
+  await writeFile(
+    join(project, "locale-keysmith.config.json"),
+    JSON.stringify({ translationFiles: ["locales/*.json"], src: ["src/**/*.ts"] })
+  );
+  await writeFile(join(project, "locales", "en.json"), '{\n  "greeting": {\n    "hello": "Hello"\n  }\n}\n');
+  await writeFile(join(project, "locales", "de.json"), '{\n  "greeting": {\n    "hello": "Hallo"\n  }\n}\n');
+  await writeFile(join(project, "src", "app.ts"), 't("greeting.hello");\n');
+
+  return project;
+}
+
 describe("cli", () => {
   it("starts with a node shebang so npm's bin link can execute it", async () => {
     const source = await readFile(cliPath, "utf8");
@@ -345,5 +378,89 @@ describe("cli", () => {
     expect(output).not.toContain("item_few");
     expect(output).not.toContain("missing pl menu.open");
     expect(output).toContain("3 issues found.");
+  });
+});
+
+describe("cli output for CI", () => {
+  it("prints scan results as JSON with relative paths", async () => {
+    const project = await createProjectCopy();
+    const { stdout, code } = await runCliWithStatus(project, "scan", "--json");
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout)).toEqual({
+      files: expect.arrayContaining([
+        { path: join("locales", "en.json"), locale: "en", format: "json" },
+        { path: join("locales", "de.json"), locale: "de", format: "json" }
+      ])
+    });
+  });
+
+  it("prints missing keys as JSON and exits 1", async () => {
+    const project = await createProjectCopy();
+    const { stdout, code } = await runCliWithStatus(project, "missing", "--json");
+    const { missing } = JSON.parse(stdout) as {
+      missing: Array<{ file: string; locale: string; key: string }>;
+    };
+
+    expect(code).toBe(1);
+    expect(missing).toContainEqual({ file: join("locales", "de.json"), locale: "de", key: "status.offline" });
+    expect(missing).toHaveLength(4);
+  });
+
+  it("prints unused keys as JSON and exits 1", async () => {
+    const project = await createProjectCopy();
+    const { stdout, code } = await runCliWithStatus(project, "unused", "--json");
+    const { unused } = JSON.parse(stdout) as { unused: Array<{ file: string; key: string }> };
+
+    expect(code).toBe(1);
+    expect(unused.map((entry) => entry.key).sort()).toEqual([
+      "draft.placeholder",
+      "legacy.deprecatedTooltip",
+      "legacy.oldButton"
+    ]);
+    expect(unused[0].file).toBe(join("locales", "en.json"));
+  });
+
+  it("prints health issues as JSON and exits 1", async () => {
+    const project = await createProjectCopy();
+    const { stdout, code } = await runCliWithStatus(project, "health", "--json");
+    const report = JSON.parse(stdout) as {
+      healthy: boolean;
+      issueCount: number;
+      issues: Array<{ type: string; file: string; locale: string; key?: string }>;
+    };
+
+    expect(code).toBe(1);
+    expect(report.healthy).toBe(false);
+    expect(report.issueCount).toBe(report.issues.length);
+    expect(report.issues).toContainEqual({
+      type: "missing",
+      file: join("locales", "de.json"),
+      locale: "de",
+      key: "status.offline"
+    });
+    expect(report.issues.some((issue) => issue.type === "unsorted")).toBe(true);
+  });
+
+  it("exits 0 with empty results when there is nothing to report", async () => {
+    const project = await createHealthyProject();
+
+    for (const command of ["missing", "unused", "health"]) {
+      const { code } = await runCliWithStatus(project, command);
+      expect(code, command).toBe(0);
+    }
+
+    const { stdout } = await runCliWithStatus(project, "health", "--json");
+    expect(JSON.parse(stdout)).toEqual({ healthy: true, issueCount: 0, issues: [] });
+  });
+
+  it("exits 2 when the command itself fails", async () => {
+    const project = await createHealthyProject();
+    await writeFile(join(project, "locale-keysmith.config.json"), JSON.stringify({ roots: "src" }));
+
+    const { stderr, code } = await runCliWithStatus(project, "health", "--json");
+
+    expect(code).toBe(2);
+    expect(stderr).toContain('"roots" must be an array of strings');
   });
 });
