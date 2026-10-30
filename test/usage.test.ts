@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { collectUsedKeys, findUsedKeys } from "@/usage";
+import { collectKeyUsage, collectUsedKeys, findKeyUsage, findUsedKeys, isKeyUsed } from "@/usage";
 
 describe("collectUsedKeys", () => {
   it("detects keys passed directly to translation calls and aliases", () => {
@@ -80,6 +80,71 @@ describe("collectUsedKeys", () => {
   });
 });
 
+describe("collectKeyUsage", () => {
+  it("is not thrown off by an apostrophe earlier in the file", () => {
+    const source = `
+      export const Page = () => <p>Don't panic</p>;
+      // it's fine
+      const nav = { home: 'nav.home' };
+      const label = t('nav.about');
+    `;
+    const { keys } = collectKeyUsage(source);
+
+    expect(keys.has("nav.home")).toBe(true);
+    expect(keys.has("nav.about")).toBe(true);
+  });
+
+  it("finds a key on the same line as an apostrophe", () => {
+    expect(collectKeyUsage("<p>Don't</p> {t('nav.home')}").keys.has("nav.home")).toBe(true);
+  });
+
+  it("records namespaced keys with and without the namespace", () => {
+    const { keys } = collectKeyUsage(`t("common:common.title"); t("common:save");`);
+
+    expect(keys.has("common.title")).toBe(true);
+    expect(keys.has("common:common.title")).toBe(true);
+    expect(keys.has("save")).toBe(true);
+  });
+
+  it("records the static prefix of dynamically built keys", () => {
+    const { keys, prefixes } = collectKeyUsage('t(`theme.${mode}`); t("errors." + code); t(`${ns}.x`);');
+
+    expect([...prefixes].sort()).toEqual(["errors.", "theme."]);
+    expect([...keys].some((key) => key.includes("${"))).toBe(false);
+  });
+});
+
+describe("isKeyUsed", () => {
+  const usage = collectKeyUsage(`
+    t("cart.item", { count });
+    t("friend.greeting", { context: gender });
+    t(\`theme.\${mode}\`);
+  `);
+
+  it.each(["cart.item_one", "cart.item_other", "cart.item_zero", "cart.item_few", "cart.item_many"])(
+    "treats the plural form %s as used",
+    (key) => {
+      expect(isKeyUsed(key, usage)).toBe(true);
+    }
+  );
+
+  it("treats context and context+plural forms as used", () => {
+    expect(isKeyUsed("friend.greeting_male", usage)).toBe(true);
+    expect(isKeyUsed("friend.greeting_male_one", usage)).toBe(true);
+  });
+
+  it("treats every key under a dynamic prefix as used", () => {
+    expect(isKeyUsed("theme.dark", usage)).toBe(true);
+    expect(isKeyUsed("theme.nested.light", usage)).toBe(true);
+  });
+
+  it("does not match unrelated keys", () => {
+    expect(isKeyUsed("cart.total", usage)).toBe(false);
+    expect(isKeyUsed("cart.itemized", usage)).toBe(false);
+    expect(isKeyUsed("themes.dark", usage)).toBe(false);
+  });
+});
+
 describe("findUsedKeys", () => {
   it("scans configured source files and aggregates their keys", async () => {
     const root = await mkdtemp(join(tmpdir(), "lk-usage-"));
@@ -91,5 +156,15 @@ describe("findUsedKeys", () => {
 
     expect(used.has("tag.work")).toBe(true);
     expect(used.has("app.title")).toBe(true);
+  });
+
+  it("aggregates dynamic prefixes across files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "lk-usage-"));
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "src", "a.ts"), "t(`theme.${mode}`);\n");
+
+    const usage = await findKeyUsage(root);
+
+    expect(usage.prefixes.has("theme.")).toBe(true);
   });
 });

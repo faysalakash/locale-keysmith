@@ -1,8 +1,8 @@
 import { Trans, useTranslation } from "react-i18next";
 
 // A "Nebula" note-taking screen, used to exercise every way a translation key
-// can appear in source. Each numbered case below is picked up by the scanner
-// except case 10, which is dynamic and cannot be resolved statically.
+// can appear in source. Each numbered case below is picked up by the scanner;
+// case 10 is dynamic, so every key under its static prefix counts as used.
 
 // (6) Indirect: keys stored as values in a lookup object, resolved via a variable.
 const priorityKey: Record<string, string> = {
@@ -62,7 +62,7 @@ export function App({ priority, online, mode }: AppProps) {
       <small>{t(`action.save`)}</small>
 
       {/* (10) Dynamic template literal — the concrete key is not knowable here,
-          so theme.dark / theme.light are intentionally NOT detected. */}
+          so every key under theme. (theme.dark / theme.light) counts as used. */}
       <span>{t(`theme.${mode}`)}</span>
     </main>
   );

@@ -100,7 +100,7 @@ pnpm exec locale-keysmith remove-unused --write      # delete unused keys and re
 ```
 
 Removes unused keys from **every** locale file (not just the source), then re-sorts them.
-Without `--write` it reports how many keys would be removed.
+It lists every key it removes; without `--write` it only lists the keys that would be removed.
 
 ### `translate`
 
@@ -182,12 +182,22 @@ const tagKeys = ["tag.work", "tag.urgent"]; // keys in an array
 const FOOTER = "footer.copyright"; // key in a constant
 ```
 
-Any string literal shaped like a dotted key path (e.g. `"a.b.c"`) is counted as used. The one
-thing that cannot be resolved statically is a **dynamically built** key, which is therefore
-not detected:
+Any string literal shaped like a dotted key path (e.g. `"a.b.c"`) is counted as used, including
+one that only appears in a comment. Keys are also matched the way i18next resolves them at
+runtime:
 
 ```ts
-t(`theme.${mode}`); // theme.dark / theme.light are NOT detected
+t("cart.item", { count }); // cart.item_one, cart.item_other, cart.item_zero, ... are used
+t("friend.greeting", { context }); // friend.greeting_male, friend.greeting_female, ... are used
+t("common:common.title"); // namespaced: common.title is used
+```
+
+A **dynamically built** key cannot be resolved statically, so every key under its static
+prefix is treated as used. That is never reported or removed:
+
+```ts
+t(`theme.${mode}`); // every key under theme. (theme.dark, theme.light, ...) is used
+t("errors." + code); // every key under errors. is used
 ```
 
 ## Development
