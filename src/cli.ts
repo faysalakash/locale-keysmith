@@ -1,10 +1,12 @@
 #!/usr/bin/env node
+import { existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { relative } from "node:path";
+import { join, relative } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
 import { emptyValueKeys, extraKeys, missingKeys, typeMismatches } from "@/checks";
-import { loadConfig } from "@/config";
+import { CONFIG_FILENAME, loadConfig } from "@/config";
+import { detectConfig } from "@/init";
 import { deleteValueByPath, filterIgnoredKeys, flattenKeys, isSorted, sortObjectKeys } from "@/keys";
 import { writeLocaleFile } from "@/parser";
 import { localeFilePath, parseLocalePath } from "@/locale-path";
@@ -30,6 +32,34 @@ program
   .name("locale-keysmith")
   .description("Sort, audit, clean, and translate locale files")
   .version(version);
+
+program
+  .command("init")
+  .description(`Create a starter ${CONFIG_FILENAME} from the locale files in this project`)
+  .option("--force", "Overwrite an existing config file")
+  .action(async (options: { force?: boolean }) => {
+    const path = join(process.cwd(), CONFIG_FILENAME);
+
+    if (existsSync(path) && !options.force) {
+      throw new Error(`${CONFIG_FILENAME} already exists. Use --force to overwrite it.`);
+    }
+
+    const { config, localeFiles, locales } = await detectConfig();
+    const content = `${JSON.stringify(config, null, 2)}\n`;
+    writeFileSync(path, content);
+
+    if (localeFiles.length === 0) {
+      console.warn(
+        chalk.yellow("No locale files found; wrote the defaults. Edit roots to point at your locale files.")
+      );
+    } else {
+      const count = `${localeFiles.length} locale file${localeFiles.length === 1 ? "" : "s"}`;
+      console.log(`Found ${count} (${locales.join(", ")}).`);
+    }
+
+    console.log(`Wrote ${CONFIG_FILENAME}:\n${content}`);
+    console.log(`Next: run ${chalk.bold("locale-keysmith health")} to check your locale files.`);
+  });
 
 program
   .command("scan")

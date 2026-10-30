@@ -13,6 +13,9 @@ Requires Node.js 22.12 or newer.
 ## Quick start
 
 ```bash
+# Write a starter config based on the locale files in your project (optional)
+pnpm exec locale-keysmith init
+
 # See which locale files are detected
 pnpm exec locale-keysmith scan
 
@@ -29,6 +32,7 @@ Run a command with `pnpm exec locale-keysmith <command>` (or `npx locale-keysmit
 
 | Command                    | What it does                                                             |
 | -------------------------- | ------------------------------------------------------------------------ |
+| `init`                     | Write a starter `locale-keysmith.config.json` for this project.          |
 | `scan`                     | List the locale files that were found, with their inferred locale.       |
 | `health`                   | Run every check below plus extra keys, empty values and type mismatches. |
 | `missing`                  | List keys present in the source locale but missing from the others.      |
@@ -61,6 +65,21 @@ Exit codes:
 | `0`  | Nothing to report.                                                                |
 | `1`  | `missing`, `unused` or `health` found something.                                  |
 | `2`  | The command itself failed (invalid config, unreadable locale file, API error...). |
+
+### `init`
+
+```bash
+pnpm exec locale-keysmith init           # refuses to overwrite an existing config
+pnpm exec locale-keysmith init --force   # overwrite it
+```
+
+Looks for locale files in the project (skipping `node_modules`, build output, and test or
+fixture folders) and writes a config with:
+
+- `sourceLocale`: `en` (or an English variant) when present, otherwise the locale with the most
+  keys.
+- `roots`: the top-level folders that hold locale files, plus `src`, `app`, `pages`,
+  `components`, `lib` and `packages` when they exist.
 
 ### `scan`
 
