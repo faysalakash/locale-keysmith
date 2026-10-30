@@ -7,7 +7,7 @@ import { emptyValueKeys, extraKeys, missingKeys, typeMismatches } from "@/checks
 import { loadConfig } from "@/config";
 import { deleteValueByPath, filterIgnoredKeys, flattenKeys, isSorted, sortObjectKeys } from "@/keys";
 import { writeLocaleFile } from "@/parser";
-import { localeFilePath } from "@/locale-path";
+import { localeFilePath, parseLocalePath } from "@/locale-path";
 import { groupLocaleFiles, loadLocaleFiles } from "@/scanner";
 import type { LocaleGroup } from "@/scanner";
 import { translateMissingKeys } from "@/translate";
@@ -15,6 +15,11 @@ import type { TranslationResult } from "@/translate";
 import type { LocaleFile, LocaleLintConfig } from "@/types";
 import { findKeyUsage, isKeyUsed } from "@/usage";
 import type { KeyUsage } from "@/usage";
+
+// 1 = the check found issues (missing/unused keys, unhealthy files); 2 = the command itself
+// failed (bad config, unreadable file, API error), so CI can tell the two apart.
+const EXIT_ISSUES = 1;
+const EXIT_ERROR = 2;
 
 // Resolves to the package root from both src/cli.ts (tsx) and dist/cli.js (published).
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
@@ -29,8 +34,22 @@ program
 program
   .command("scan")
   .description("Find translation files")
-  .action(async () => {
+  .option("--json", "Print the result as JSON")
+  .action(async (options: { json?: boolean }) => {
     const files = await loadLocaleFiles();
+
+    if (options.json) {
+      printJson({
+        files: files.map((file) => ({
+          path: relativePath(file.path),
+          locale: file.locale,
+          namespace: parseLocalePath(file.path)?.namespace,
+          format: file.format
+        }))
+      });
+
+      return;
+    }
 
     if (files.length === 0) {
       console.log(chalk.yellow("No locale files found."));
@@ -69,45 +88,76 @@ program
 
 program
   .command("missing")
-  .description("Find keys missing from non-source locales")
-  .action(async () => {
+  .description("Find keys missing from non-source locales (exits 1 when any are missing)")
+  .option("--json", "Print the result as JSON")
+  .action(async (options: { json?: boolean }) => {
     const config = loadConfig();
     const groups = await loadGroups(config.sourceLocale);
-
-    for (const { source, targets } of groups) {
+    const results = groups.flatMap(({ source, targets }) => {
       const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
 
-      for (const file of targets) {
-        const missing = missingKeys(sourceKeys, file);
-        console.log(chalk.bold(label(file, groups)));
+      return targets.map((file) => ({ file, missing: missingKeys(sourceKeys, file) }));
+    });
 
-        if (missing.length === 0) {
-          console.log(chalk.green("  no missing keys"));
-          continue;
-        }
+    if (results.some((result) => result.missing.length > 0)) {
+      process.exitCode = EXIT_ISSUES;
+    }
 
-        for (const key of missing) {
-          console.log(`  ${key}`);
-        }
+    if (options.json) {
+      printJson({
+        missing: results.flatMap(({ file, missing }) =>
+          missing.map((key) => ({ file: relativePath(file.path), locale: file.locale, key }))
+        )
+      });
+
+      return;
+    }
+
+    for (const { file, missing } of results) {
+      console.log(chalk.bold(label(file, groups)));
+
+      if (missing.length === 0) {
+        console.log(chalk.green("  no missing keys"));
+        continue;
+      }
+
+      for (const key of missing) {
+        console.log(`  ${key}`);
       }
     }
   });
 
 program
   .command("unused")
-  .description("Find translation keys not used in source files")
-  .action(async () => {
+  .description("Find translation keys not used in source files (exits 1 when any are unused)")
+  .option("--json", "Print the result as JSON")
+  .action(async (options: { json?: boolean }) => {
     const config = loadConfig();
     const groups = await loadGroups(config.sourceLocale);
     const usage = await findKeyUsage();
-    let total = 0;
+    const results = groups.map(({ source }) => ({
+      source,
+      unused: findUnusedKeys(source, config.ignoreKeys, usage)
+    }));
+    const total = results.reduce((sum, result) => sum + result.unused.length, 0);
 
-    for (const { source } of groups) {
-      const unused = findUnusedKeys(source, config.ignoreKeys, usage);
-      total += unused.length;
+    if (total > 0) {
+      process.exitCode = EXIT_ISSUES;
+    }
 
+    if (options.json) {
+      printJson({
+        unused: results.flatMap(({ source, unused }) =>
+          unused.map((key) => ({ file: relativePath(source.path), key }))
+        )
+      });
+
+      return;
+    }
+
+    for (const { source, unused } of results) {
       if (groups.length > 1 && unused.length > 0) {
-        console.log(chalk.bold(relative(process.cwd(), source.path)));
+        console.log(chalk.bold(relativePath(source.path)));
       }
 
       for (const key of unused) {
@@ -125,10 +175,32 @@ program
   .description(
     "Report unsorted files, missing/extra/unused keys, empty values and type mismatches (exits non-zero on any issue)"
   )
-  .action(async () => {
+  .option("--json", "Print the result as JSON")
+  .action(async (options: { json?: boolean }) => {
     const config = loadConfig();
     const groups = await loadGroups(config.sourceLocale);
     const issues = collectHealthIssues(groups, config, await findKeyUsage());
+
+    if (issues.length > 0) {
+      process.exitCode = EXIT_ISSUES;
+    }
+
+    if (options.json) {
+      printJson({
+        healthy: issues.length === 0,
+        issueCount: issues.length,
+        issues: issues.map((issue) => ({
+          type: issue.type,
+          file: relativePath(issue.file.path),
+          locale: issue.file.locale,
+          key: issue.key,
+          sourceType: issue.kinds?.source,
+          targetType: issue.kinds?.target
+        }))
+      });
+
+      return;
+    }
 
     for (const issue of issues) {
       console.log(formatIssue(issue, groups));
@@ -141,7 +213,6 @@ program
     }
 
     console.log(chalk.bold(`\n${issues.length} issue${issues.length === 1 ? "" : "s"} found.`));
-    process.exitCode = 1;
   });
 
 program
@@ -165,7 +236,7 @@ program
       total += unused.length;
 
       if (groups.length > 1) {
-        console.log(chalk.bold(relative(process.cwd(), group.source.path)));
+        console.log(chalk.bold(relativePath(group.source.path)));
       }
 
       // List every key so a deletion can be reviewed (and diffed against `unused`).
@@ -271,7 +342,7 @@ program
 
 program.parseAsync().catch((error: unknown) => {
   console.error(chalk.red(error instanceof Error ? error.message : String(error)));
-  process.exitCode = 1;
+  process.exitCode = EXIT_ERROR;
 });
 
 type SourcedGroup = LocaleGroup & { source: LocaleFile };
@@ -287,7 +358,7 @@ async function loadGroups(sourceLocale: string): Promise<SourcedGroup[]> {
 
   for (const group of groups) {
     if (!group.source) {
-      const where = relative(process.cwd(), group.id);
+      const where = relativePath(group.id);
       console.warn(chalk.yellow(`skipped ${where}: no "${sourceLocale}" file to compare against`));
     }
   }
@@ -295,9 +366,17 @@ async function loadGroups(sourceLocale: string): Promise<SourcedGroup[]> {
   return sourced;
 }
 
+function printJson(value: unknown): void {
+  console.log(JSON.stringify(value, null, 2));
+}
+
+function relativePath(path: string): string {
+  return relative(process.cwd(), path);
+}
+
 /** The locale, plus the file path when there is more than one group to tell apart. */
 function label(file: LocaleFile, groups: LocaleGroup[]): string {
-  return groups.length > 1 ? `${file.locale} (${relative(process.cwd(), file.path)})` : file.locale;
+  return groups.length > 1 ? `${file.locale} (${relativePath(file.path)})` : file.locale;
 }
 
 type IssueType = "unsorted" | "missing" | "extra" | "empty" | "type-mismatch" | "unused";
@@ -367,7 +446,7 @@ function formatIssue(issue: Issue, groups: LocaleGroup[]): string {
     case "unsorted":
       return `${chalk.yellow("unsorted")} ${issue.file.path}`;
     case "unused":
-      return `${chalk.red("unused")} ${issue.key}${groups.length > 1 ? ` (${relative(process.cwd(), issue.file.path)})` : ""}`;
+      return `${chalk.red("unused")} ${issue.key}${groups.length > 1 ? ` (${relativePath(issue.file.path)})` : ""}`;
     case "type-mismatch":
       return `${chalk.red("type-mismatch")} ${name} ${issue.key} (${issue.kinds?.source} in the source, ${issue.kinds?.target} here)`;
     case "empty":
