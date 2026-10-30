@@ -69,6 +69,22 @@ describe("translateMissingKeys", () => {
     expect(getValueByPath(target.data, "auth.login")).toBe("Anmelden");
   });
 
+  it("translates plural forms the source language lacks from its _other form", async () => {
+    vi.stubEnv("GOOGLE_TRANSLATE_API_KEY", "test-key");
+    const requests = mockTranslateApi((text) => `pl ${text}`);
+
+    const target = localeFile({}, "pl");
+    await translateMissingKeys({
+      source: localeFile({ item_one: "one item", item_other: "many items" }, "en"),
+      target,
+      targetLanguage: "pl",
+      keys: ["item_few"]
+    });
+
+    expect(requests[0].body.q).toEqual(["many items"]);
+    expect(target.data.item_few).toBe("pl many items");
+  });
+
   it("sends the API key in a header, never in the URL", async () => {
     vi.stubEnv("GOOGLE_TRANSLATE_API_KEY", "secret-key");
     const requests = mockTranslateApi();

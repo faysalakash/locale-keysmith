@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { relative } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
+import { emptyValueKeys, extraKeys, missingKeys, typeMismatches } from "@/checks";
 import { loadConfig } from "@/config";
 import { deleteValueByPath, filterIgnoredKeys, flattenKeys, isSorted, sortObjectKeys } from "@/keys";
 import { writeLocaleFile } from "@/parser";
@@ -11,7 +12,7 @@ import { groupLocaleFiles, loadLocaleFiles } from "@/scanner";
 import type { LocaleGroup } from "@/scanner";
 import { translateMissingKeys } from "@/translate";
 import type { TranslationResult } from "@/translate";
-import type { LocaleFile } from "@/types";
+import type { LocaleFile, LocaleLintConfig } from "@/types";
 import { findKeyUsage, isKeyUsed } from "@/usage";
 import type { KeyUsage } from "@/usage";
 
@@ -77,7 +78,7 @@ program
       const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
 
       for (const file of targets) {
-        const missing = missingKeysFor(sourceKeys, file);
+        const missing = missingKeys(sourceKeys, file);
         console.log(chalk.bold(label(file, groups)));
 
         if (missing.length === 0) {
@@ -121,48 +122,25 @@ program
 
 program
   .command("health")
-  .description("Report missing keys, unused keys, and unsorted files (exits non-zero on any issue)")
+  .description(
+    "Report unsorted files, missing/extra/unused keys, empty values and type mismatches (exits non-zero on any issue)"
+  )
   .action(async () => {
     const config = loadConfig();
     const groups = await loadGroups(config.sourceLocale);
-    const files = groups.flatMap((group) => [group.source, ...group.targets]);
-    const usage = await findKeyUsage();
+    const issues = collectHealthIssues(groups, config, await findKeyUsage());
 
-    let issues = 0;
-
-    const unsorted = files.filter((file) => !isSorted(file.data));
-    for (const file of unsorted) {
-      console.log(`${chalk.yellow("unsorted")} ${file.path}`);
-    }
-    issues += unsorted.length;
-
-    for (const { source, targets } of groups) {
-      const sourceKeys = filterIgnoredKeys(flattenKeys(source.data), config.ignoreKeys);
-
-      for (const file of targets) {
-        const missing = missingKeysFor(sourceKeys, file);
-        for (const key of missing) {
-          console.log(`${chalk.red("missing")} ${label(file, groups)} ${key}`);
-        }
-        issues += missing.length;
-      }
-
-      const unused = findUnusedKeys(source, config.ignoreKeys, usage);
-      for (const key of unused) {
-        console.log(
-          `${chalk.red("unused")} ${key}${groups.length > 1 ? ` (${relative(process.cwd(), source.path)})` : ""}`
-        );
-      }
-      issues += unused.length;
+    for (const issue of issues) {
+      console.log(formatIssue(issue, groups));
     }
 
-    if (issues === 0) {
+    if (issues.length === 0) {
       console.log(chalk.green("All locale files are healthy."));
 
       return;
     }
 
-    console.log(chalk.bold(`\n${issues} issue${issues === 1 ? "" : "s"} found.`));
+    console.log(chalk.bold(`\n${issues.length} issue${issues.length === 1 ? "" : "s"} found.`));
     process.exitCode = 1;
   });
 
@@ -244,7 +222,7 @@ program
         const target =
           targets.find((file) => file.locale === locale) ?? createEmptyLocaleFile(source, locale);
         const name = label(target, groups);
-        const missing = missingKeysFor(sourceKeys, target);
+        const missing = missingKeys(sourceKeys, target);
 
         if (missing.length === 0) {
           console.log(chalk.green(`${name}: no missing keys`));
@@ -259,7 +237,8 @@ program
         // Saves whatever has been translated so far; also runs when a request fails midway,
         // so a rerun only has to translate the remaining keys.
         const save = (): number => {
-          const translated = missing.length - missingKeysFor(missing, target).length;
+          const present = new Set(flattenKeys(target.data));
+          const translated = missing.filter((key) => present.has(key)).length;
 
           if (translated > 0) {
             target.data = sortObjectKeys(target.data);
@@ -321,10 +300,81 @@ function label(file: LocaleFile, groups: LocaleGroup[]): string {
   return groups.length > 1 ? `${file.locale} (${relative(process.cwd(), file.path)})` : file.locale;
 }
 
-function missingKeysFor(sourceKeys: string[], target: LocaleFile): string[] {
-  const present = new Set(flattenKeys(target.data));
+type IssueType = "unsorted" | "missing" | "extra" | "empty" | "type-mismatch" | "unused";
 
-  return sourceKeys.filter((key) => !present.has(key));
+interface Issue {
+  type: IssueType;
+  file: LocaleFile;
+  key?: string;
+  /** For type mismatches: what the key holds in the source and in this file. */
+  kinds?: { source: string; target: string };
+}
+
+function collectHealthIssues(groups: SourcedGroup[], config: LocaleLintConfig, usage: KeyUsage): Issue[] {
+  const issues: Issue[] = [];
+  const keep = (keys: string[]): string[] => filterIgnoredKeys(keys, config.ignoreKeys);
+
+  for (const file of groups.flatMap((group) => [group.source, ...group.targets])) {
+    if (!isSorted(file.data)) {
+      issues.push({ type: "unsorted", file });
+    }
+  }
+
+  for (const { source, targets } of groups) {
+    const sourceKeys = keep(flattenKeys(source.data));
+
+    for (const key of keep(emptyValueKeys(source))) {
+      issues.push({ type: "empty", file: source, key });
+    }
+
+    for (const file of targets) {
+      const mismatches = typeMismatches(source.data, file.data).filter(
+        (mismatch) => keep([mismatch.key]).length > 0
+      );
+      // A key with the wrong shape would also show up as missing/extra keys below it; report it once.
+      const underMismatch = (key: string): boolean =>
+        mismatches.some((mismatch) => key === mismatch.key || key.startsWith(`${mismatch.key}.`));
+
+      for (const mismatch of mismatches) {
+        issues.push({ type: "type-mismatch", file, key: mismatch.key, kinds: mismatch });
+      }
+
+      for (const key of missingKeys(sourceKeys, file).filter((key) => !underMismatch(key))) {
+        issues.push({ type: "missing", file, key });
+      }
+
+      for (const key of keep(extraKeys(sourceKeys, file)).filter((key) => !underMismatch(key))) {
+        issues.push({ type: "extra", file, key });
+      }
+
+      for (const key of keep(emptyValueKeys(file))) {
+        issues.push({ type: "empty", file, key });
+      }
+    }
+
+    for (const key of findUnusedKeys(source, config.ignoreKeys, usage)) {
+      issues.push({ type: "unused", file: source, key });
+    }
+  }
+
+  return issues;
+}
+
+function formatIssue(issue: Issue, groups: LocaleGroup[]): string {
+  const name = label(issue.file, groups);
+
+  switch (issue.type) {
+    case "unsorted":
+      return `${chalk.yellow("unsorted")} ${issue.file.path}`;
+    case "unused":
+      return `${chalk.red("unused")} ${issue.key}${groups.length > 1 ? ` (${relative(process.cwd(), issue.file.path)})` : ""}`;
+    case "type-mismatch":
+      return `${chalk.red("type-mismatch")} ${name} ${issue.key} (${issue.kinds?.source} in the source, ${issue.kinds?.target} here)`;
+    case "empty":
+      return `${chalk.yellow("empty")} ${name} ${issue.key}`;
+    default:
+      return `${chalk.red(issue.type)} ${name} ${issue.key}`;
+  }
 }
 
 function findUnusedKeys(source: LocaleFile, ignoreKeys: string[], usage: KeyUsage): string[] {

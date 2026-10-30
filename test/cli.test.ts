@@ -297,4 +297,53 @@ describe("cli", () => {
     );
     expect(output).toContain(`fr (${join("public", "locales", "fr", "home.json")}): would translate 1 keys`);
   });
+
+  it("reports extra keys, empty values and type mismatches via health", async () => {
+    const project = await mkdtemp(join(tmpdir(), "locale-keysmith-"));
+    await mkdir(join(project, "locales"), { recursive: true });
+    await mkdir(join(project, "src"), { recursive: true });
+    await writeFile(
+      join(project, "locale-keysmith.config.json"),
+      JSON.stringify({ translationFiles: ["locales/*.json"], src: ["src/**/*.ts"] })
+    );
+    await writeFile(
+      join(project, "locales", "en.json"),
+      JSON.stringify(
+        {
+          cart: { item_one: "{{count}} item", item_other: "{{count}} items" },
+          menu: { open: "Open" },
+          title: ""
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(
+      join(project, "locales", "pl.json"),
+      JSON.stringify(
+        {
+          cart: { item_few: "a", item_many: "b", item_one: "c", item_other: "d" },
+          legacy: "Stare",
+          menu: "Menu",
+          title: "Tytuł"
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(
+      join(project, "src", "app.ts"),
+      't("cart.item", { count }); t("menu.open"); t("title"); t("legacy");'
+    );
+
+    const output = await runCli(project, "health");
+
+    expect(output).toContain("empty en title");
+    expect(output).toContain("extra pl legacy");
+    expect(output).toContain("type-mismatch pl menu (object in the source, string here)");
+    // Polish plural forms are neither missing nor extra, and menu.open is reported once (as the mismatch).
+    expect(output).not.toContain("item_few");
+    expect(output).not.toContain("missing pl menu.open");
+    expect(output).toContain("3 issues found.");
+  });
 });

@@ -27,15 +27,15 @@ file (see [Configuration](#configuration)).
 
 Run a command with `pnpm exec locale-keysmith <command>` (or `npx locale-keysmith <command>`).
 
-| Command                    | What it does                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------- |
-| `scan`                     | List the locale files that were found, with their inferred locale.              |
-| `health`                   | Report missing keys, unused keys, and unsorted files. Exits non-zero on issues. |
-| `missing`                  | List keys present in the source locale but missing from the others.             |
-| `unused`                   | List source-locale keys that no source file references.                         |
-| `sort`                     | Sort every locale file's keys alphabetically (nested too).                      |
-| `remove-unused`            | Delete unused keys from every locale file.                                      |
-| `translate --to <locales>` | Fill missing keys in target locales via Google Translate.                       |
+| Command                    | What it does                                                             |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `scan`                     | List the locale files that were found, with their inferred locale.       |
+| `health`                   | Run every check below plus extra keys, empty values and type mismatches. |
+| `missing`                  | List keys present in the source locale but missing from the others.      |
+| `unused`                   | List source-locale keys that no source file references.                  |
+| `sort`                     | Sort every locale file's keys alphabetically (nested too).               |
+| `remove-unused`            | Delete unused keys from every locale file.                               |
+| `translate --to <locales>` | Fill missing keys in target locales via Google Translate.                |
 
 ### `scan`
 
@@ -51,18 +51,31 @@ Prints one line per detected locale file, e.g. `en  src/locales/en.json`.
 pnpm exec locale-keysmith health
 ```
 
-A one-shot audit that combines the checks below. It prints each problem it finds:
+A one-shot audit. It prints each problem it finds:
 
 ```
 unsorted src/locales/de.json
 missing de status.offline
-unused legacy.oldButton
+extra de legacy.oldButton
+empty de app.tagline
+type-mismatch de menu (object in the source, string here)
+unused draft.placeholder
 
-3 issues found.
+6 issues found.
 ```
 
+| Issue           | Meaning                                                                       |
+| --------------- | ----------------------------------------------------------------------------- |
+| `unsorted`      | The file's keys are not in alphabetical order (fix with `sort --write`).      |
+| `missing`       | A key from the source locale is absent in this locale.                        |
+| `extra`         | This locale has a key the source locale does not (often a leftover).          |
+| `empty`         | The value is an empty or whitespace-only string, or `null`.                   |
+| `type-mismatch` | The key holds a different kind of value than in the source (text vs. object). |
+| `unused`        | No source file references the key.                                            |
+
 It exits with a non-zero status when any issue is found, so it can gate CI. When everything
-is fine it prints `All locale files are healthy.` and exits `0`.
+is fine it prints `All locale files are healthy.` and exits `0`. Keys matching `ignoreKeys`
+are skipped by every check.
 
 ### `missing`
 
@@ -71,6 +84,11 @@ pnpm exec locale-keysmith missing
 ```
 
 Lists, per non-source locale, the keys that exist in the source locale but are absent.
+
+Plural keys follow each language's plural rules, as i18next does: English `item_one` /
+`item_other` means Polish needs `item_one`, `item_few`, `item_many` and `item_other`, while
+Japanese only needs `item_other`. Neither is reported as missing or extra for doing so, and
+`translate` fills plural forms the source language lacks from its `_other` text.
 
 ### `unused`
 
