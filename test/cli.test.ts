@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -462,5 +462,38 @@ describe("cli output for CI", () => {
 
     expect(code).toBe(2);
     expect(stderr).toContain('"roots" must be an array of strings');
+  });
+});
+
+describe("cli init", () => {
+  it("writes a config that the other commands pick up", async () => {
+    const project = await createProjectCopy();
+    await rm(join(project, "locale-keysmith.config.json"));
+
+    const init = await runCliWithStatus(project, "init");
+    const config = JSON.parse(
+      await readFile(join(project, "locale-keysmith.config.json"), "utf8")
+    ) as unknown;
+    const scan = await runCliWithStatus(project, "scan", "--json");
+
+    expect(init.code).toBe(0);
+    expect(init.stdout).toContain("Found 2 locale files (de, en).");
+    expect(config).toEqual({ sourceLocale: "en", roots: ["locales", "src"], ignoreKeys: [] });
+    expect((JSON.parse(scan.stdout) as { files: unknown[] }).files).toHaveLength(2);
+  });
+
+  it("refuses to overwrite an existing config without --force", async () => {
+    const project = await createProjectCopy();
+    const configPath = join(project, "locale-keysmith.config.json");
+    const before = await readFile(configPath, "utf8");
+
+    const refused = await runCliWithStatus(project, "init");
+    expect(refused.code).toBe(2);
+    expect(refused.stderr).toContain("already exists. Use --force");
+    expect(await readFile(configPath, "utf8")).toBe(before);
+
+    const forced = await runCliWithStatus(project, "init", "--force");
+    expect(forced.code).toBe(0);
+    expect(await readFile(configPath, "utf8")).not.toBe(before);
   });
 });
