@@ -182,6 +182,24 @@ describe("cli", () => {
     expect(output).toContain("de: would translate 4 keys");
   });
 
+  it("translates from the configured source locale and honours ignoreKeys", async () => {
+    const project = await createProjectCopy();
+    await writeFile(
+      join(project, "locale-keysmith.config.json"),
+      JSON.stringify({
+        sourceLocale: "de",
+        translationFiles: ["locales/*.json"],
+        src: ["src/**/*.tsx"],
+        ignoreKeys: ["app.*"]
+      })
+    );
+
+    const output = await runCli(project, "translate", "--to", "fr");
+
+    // de.json has 15 keys, 3 of them under app.*
+    expect(output).toContain("fr: would translate 12 keys");
+  });
+
   it("previews translations for a brand-new target locale", async () => {
     const project = await createProjectCopy();
     const output = await runCli(project, "translate", "--to", "fr");
