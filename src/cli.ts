@@ -43,9 +43,15 @@ program
   .description("Sort locale keys alphabetically")
   .option("--write", "Write changes to disk")
   .action(async (options: { write?: boolean }) => {
-    const files = await loadLocaleFiles();
+    const unsorted = (await loadLocaleFiles()).filter((file) => !isSorted(file.data));
 
-    for (const file of files) {
+    if (unsorted.length === 0) {
+      console.log(chalk.green("All locale files are already sorted."));
+
+      return;
+    }
+
+    for (const file of unsorted) {
       file.data = sortObjectKeys(file.data);
 
       if (options.write) {

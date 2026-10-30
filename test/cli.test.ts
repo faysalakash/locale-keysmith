@@ -124,6 +124,15 @@ describe("cli", () => {
     expect(en.indexOf('"high"')).toBeLessThan(en.indexOf('"low"'));
   });
 
+  it("only reports files that sorting would change", async () => {
+    const project = await createProjectCopy();
+    await runCli(project, "sort", "--write");
+    const output = await runCli(project, "sort");
+
+    expect(output).toContain("All locale files are already sorted.");
+    expect(output).not.toContain("would sort");
+  });
+
   it("previews unused key removal by default", async () => {
     const project = await createProjectCopy();
     const output = await runCli(project, "remove-unused", "--dry-run");
