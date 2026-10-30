@@ -162,8 +162,26 @@ set either explicitly, which overrides the derived globs:
 | `src`              | `<root>/**/*.{ts,tsx,js,jsx,mjs,cjs,vue,svelte}` per root | Globs for source files (overrides the derived globs). |
 | `ignoreKeys`       | `[]`                                                      | Key patterns excluded from audits (`*` wildcard).     |
 
-`node_modules`, `dist`, and `.next` are always ignored. The locale of each file is inferred
-from its filename (`en.json` → `en`, `pt-BR.yaml` → `pt-BR`).
+`node_modules`, `dist`, and `.next` are always ignored.
+
+### How locale files are recognised
+
+A matched file is only treated as a locale file when its name or its directory is a locale
+code, so config files such as `package.json` or `src/data/config.json` are never read or
+rewritten:
+
+| Path                            | Locale  | Notes                                   |
+| ------------------------------- | ------- | --------------------------------------- |
+| `src/locales/en.json`           | `en`    | from the file name                      |
+| `config/locales/pt-BR.yml`      | `pt-BR` | `pt_BR`, `zh-Hant`, `es-419` work too   |
+| `public/locales/de/common.json` | `de`    | from the directory (i18next namespaces) |
+| `src/data/config.json`          | —       | skipped: not a locale file              |
+
+Files are compared only with their own translations: `app/locales/de.json` with
+`app/locales/en.json`, `public/locales/de/common.json` with `public/locales/en/common.json`.
+That lets one config cover several independent sets of locale files (an app and a plugin, or
+several namespaces). Two files for the same locale in one set (say `en.json` and `en.yaml`
+side by side) are reported as an error.
 
 ### Key usage detection
 

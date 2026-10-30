@@ -1,6 +1,7 @@
 import { extname } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 import YAML from "yaml";
+import { parseLocalePath } from "@/locale-path";
 import type { LocaleFile, LocaleObject } from "@/types";
 
 export function readLocaleFile(path: string): LocaleFile {
@@ -45,7 +46,7 @@ export function writeLocaleFile(file: LocaleFile): void {
 export function inferLocale(path: string): string {
   const filename = path.split(/[\\/]/).at(-1) ?? "";
 
-  return filename.replace(/\.(json|ya?ml)$/i, "");
+  return parseLocalePath(path)?.locale ?? filename.replace(/\.(json|ya?ml)$/i, "");
 }
 
 function toJson(data: LocaleObject, original: string | undefined): string {
