@@ -10,12 +10,12 @@ import { translateMissingKeys } from "@/translate";
 import type { LocaleFile, LocaleObject } from "@/types";
 
 // Calls the real Google Translate API, so it only runs when asked to:
-//   LIVE_TRANSLATE=1 GOOGLE_TRANSLATE_API_KEY=... pnpm run test:live
+//   GOOGLE_TRANSLATE_API_KEY=... pnpm run test:live   (vitest --mode live)
 // A full run sends roughly 2,000 characters.
-const live = process.env.LIVE_TRANSLATE === "1";
+const live = import.meta.env.MODE === "live";
 
 if (live && !process.env.GOOGLE_TRANSLATE_API_KEY) {
-  throw new Error("LIVE_TRANSLATE=1 needs GOOGLE_TRANSLATE_API_KEY to be set.");
+  throw new Error("pnpm run test:live needs GOOGLE_TRANSLATE_API_KEY to be set.");
 }
 
 const execFileAsync = promisify(execFile);

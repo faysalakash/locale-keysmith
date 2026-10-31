@@ -5,3 +5,14 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  # npm dependencies (pnpm lockfile). Minor and patch updates arrive as one grouped PR a week;
+  # majors get their own PR, since they can break the build (e.g. TypeScript 7 before
+  # typescript-eslint supports it).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
