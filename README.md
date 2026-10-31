@@ -317,3 +317,11 @@ pnpm run test        # Vitest
 pnpm run coverage    # Vitest with v8 coverage
 pnpm run check       # lint + format:check + build + test
 ```
+
+`pnpm run test` never calls Google Translate. To check `translate` against the real API
+(placeholders, HTML entities, batching, error messages), run the live tests with a key. A
+full run sends about 2,000 characters:
+
+```bash
+GOOGLE_TRANSLATE_API_KEY="your-api-key" pnpm run test:live
+```
