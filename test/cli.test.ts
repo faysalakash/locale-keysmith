@@ -287,8 +287,9 @@ describe("cli", () => {
     await runCli(project, "sort", "--write");
     await runCli(project, "remove-unused", "--write");
 
-    expect(scan).not.toContain("config.json");
-    expect(scan).not.toContain("package.json");
+    const [found, skipped] = scan.split("Skipped");
+    expect(found).not.toContain("config.json");
+    expect(skipped).toContain(join("src", "data", "config.json"));
     expect(await readFile(join(project, "src", "data", "config.json"), "utf8")).toBe(config);
   });
 
@@ -391,8 +392,33 @@ describe("cli output for CI", () => {
       files: expect.arrayContaining([
         { path: join("locales", "en.json"), locale: "en", format: "json" },
         { path: join("locales", "de.json"), locale: "de", format: "json" }
-      ])
+      ]),
+      skipped: []
     });
+  });
+
+  it("lists the files scan skipped, and why", async () => {
+    const project = await createProjectCopy();
+    await writeFile(join(project, "locales", "english.json"), '{ "a": "1" }');
+
+    const text = await runCli(project, "scan");
+    const { stdout } = await runCliWithStatus(project, "scan", "--json");
+
+    expect(text).toContain("Skipped 1 file whose name or folder is not a locale code:");
+    expect(text).toContain(`  ${join("locales", "english.json")}`);
+    expect((JSON.parse(stdout) as { skipped: string[] }).skipped).toEqual([join("locales", "english.json")]);
+  });
+
+  it("still lists skipped files when no locale file is found", async () => {
+    const project = await createProjectCopy();
+    await rm(join(project, "locales", "en.json"));
+    await rm(join(project, "locales", "de.json"));
+    await writeFile(join(project, "locales", "messages.json"), '{ "a": "1" }');
+
+    const output = await runCli(project, "scan");
+
+    expect(output).toContain("No locale files found.");
+    expect(output).toContain(join("locales", "messages.json"));
   });
 
   it("prints missing keys as JSON and exits 1", async () => {

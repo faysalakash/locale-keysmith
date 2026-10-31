@@ -87,7 +87,19 @@ fixture folders) and writes a config with:
 pnpm exec locale-keysmith scan
 ```
 
-Prints one line per detected locale file, e.g. `en  src/locales/en.json`.
+Prints one line per detected locale file, e.g. `en  src/locales/en.json`. Matched JSON/YAML
+files that are not locale files (see [How locale files are recognised](#how-locale-files-are-recognised))
+are listed underneath as skipped, so you can see why a file you expected is missing:
+
+```
+en src/locales/en.json
+de src/locales/de.json
+
+Skipped 1 file whose name or folder is not a locale code:
+  src/locales/english.json
+```
+
+With `--json`, the skipped files are in the `skipped` array.
 
 ### `health`
 

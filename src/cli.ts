@@ -8,9 +8,9 @@ import { emptyValueKeys, extraKeys, missingKeys, typeMismatches } from "@/checks
 import { CONFIG_FILENAME, loadConfig } from "@/config";
 import { detectConfig } from "@/init";
 import { deleteValueByPath, filterIgnoredKeys, flattenKeys, isSorted, sortObjectKeys } from "@/keys";
-import { writeLocaleFile } from "@/parser";
+import { readLocaleFile, writeLocaleFile } from "@/parser";
 import { localeFilePath, parseLocalePath } from "@/locale-path";
-import { groupLocaleFiles, loadLocaleFiles } from "@/scanner";
+import { groupLocaleFiles, loadLocaleFiles, scanTranslationFiles } from "@/scanner";
 import type { LocaleGroup } from "@/scanner";
 import { translateMissingKeys } from "@/translate";
 import type { TranslationResult } from "@/translate";
@@ -66,7 +66,8 @@ program
   .description("Find translation files")
   .option("--json", "Print the result as JSON")
   .action(async (options: { json?: boolean }) => {
-    const files = await loadLocaleFiles();
+    const { localeFiles, skipped } = await scanTranslationFiles();
+    const files = localeFiles.map(readLocaleFile);
 
     if (options.json) {
       printJson({
@@ -75,7 +76,8 @@ program
           locale: file.locale,
           namespace: parseLocalePath(file.path)?.namespace,
           format: file.format
-        }))
+        })),
+        skipped: skipped.map(relativePath)
       });
 
       return;
@@ -83,12 +85,23 @@ program
 
     if (files.length === 0) {
       console.log(chalk.yellow("No locale files found."));
-
-      return;
     }
 
     for (const file of files) {
-      console.log(`${chalk.green(file.locale)} ${file.path}`);
+      console.log(`${chalk.green(file.locale)} ${relativePath(file.path)}`);
+    }
+
+    // Explains why a file someone expected to see is missing from the list above.
+    if (skipped.length > 0) {
+      console.log(
+        chalk.dim(
+          `\nSkipped ${skipped.length} file${skipped.length === 1 ? "" : "s"} whose name or folder is not a locale code:`
+        )
+      );
+
+      for (const path of skipped) {
+        console.log(chalk.dim(`  ${relativePath(path)}`));
+      }
     }
   });
 

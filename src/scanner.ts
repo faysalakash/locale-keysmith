@@ -13,11 +13,29 @@ export interface LocaleGroup {
   targets: LocaleFile[];
 }
 
+export interface TranslationFileScan {
+  /** Files whose name or directory is a locale code. */
+  localeFiles: string[];
+  /** Files matched by the config globs that are not locale files, e.g. `src/data/config.json`. */
+  skipped: string[];
+}
+
+/** Splits the files matched by the config globs into locale files and skipped files. */
+export async function scanTranslationFiles(cwd = process.cwd()): Promise<TranslationFileScan> {
+  const paths = await globFiles(loadConfig(cwd).translationFiles, cwd, [`**/${CONFIG_FILENAME}`]);
+  const localeFiles: string[] = [];
+  const skipped: string[] = [];
+
+  for (const path of paths) {
+    (parseLocalePath(path) === undefined ? skipped : localeFiles).push(path);
+  }
+
+  return { localeFiles, skipped };
+}
+
 /** Locale files matched by the config globs whose name or directory is a locale code. */
 export async function findLocaleFiles(cwd = process.cwd()): Promise<string[]> {
-  const paths = await globFiles(loadConfig(cwd).translationFiles, cwd, [`**/${CONFIG_FILENAME}`]);
-
-  return paths.filter((path) => parseLocalePath(path) !== undefined);
+  return (await scanTranslationFiles(cwd)).localeFiles;
 }
 
 export async function loadLocaleFiles(cwd = process.cwd()): Promise<LocaleFile[]> {
