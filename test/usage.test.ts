@@ -106,6 +106,36 @@ describe("collectKeyUsage", () => {
     expect(keys.has("save")).toBe(true);
   });
 
+  it("applies a useTranslation keyPrefix to the keys in the file", () => {
+    const source = `
+      const { t } = useTranslation("translation", { keyPrefix: "settings" });
+      t("title"); t("common:save"); t(\`tabs.\${tab}\`);
+      const LABEL = "profile.name";
+    `;
+    const { keys, prefixes } = collectKeyUsage(source);
+
+    expect(keys.has("settings.title")).toBe(true);
+    expect(keys.has("settings.save")).toBe(true);
+    expect(keys.has("settings.profile.name")).toBe(true);
+    expect(prefixes.has("settings.tabs.")).toBe(true);
+    // The unprefixed forms are kept too: another t in the same file may not use the prefix.
+    expect(keys.has("title")).toBe(true);
+  });
+
+  it("applies the keyPrefix argument of getFixedT", () => {
+    const { keys } = collectKeyUsage(
+      `const t = i18next.getFixedT(null, "admin", 'users.table'); t("empty");`
+    );
+
+    expect(keys.has("users.table.empty")).toBe(true);
+  });
+
+  it("ignores a keyPrefix built at runtime", () => {
+    const { keys } = collectKeyUsage("useTranslation('x', { keyPrefix: `${area}` }); t('title');");
+
+    expect([...keys]).toEqual(["title"]);
+  });
+
   it("records the static prefix of dynamically built keys", () => {
     const { keys, prefixes } = collectKeyUsage('t(`theme.${mode}`); t("errors." + code); t(`${ns}.x`);');
 
