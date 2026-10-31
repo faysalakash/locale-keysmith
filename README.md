@@ -111,18 +111,20 @@ A one-shot audit. It prints each problem it finds:
 
 ```
 unsorted src/locales/de.json
+duplicate en nav.home
 missing de status.offline
 extra de legacy.oldButton
 empty de app.tagline
 type-mismatch de menu (object in the source, string here)
 unused draft.placeholder
 
-6 issues found.
+7 issues found.
 ```
 
 | Issue           | Meaning                                                                       |
 | --------------- | ----------------------------------------------------------------------------- |
 | `unsorted`      | The file's keys are not in alphabetical order (fix with `sort --write`).      |
+| `duplicate`     | The file defines a key twice, e.g. `"nav.home"` and `"nav": { "home" }`.      |
 | `missing`       | A key from the source locale is absent in this locale.                        |
 | `extra`         | This locale has a key the source locale does not (often a leftover).          |
 | `empty`         | The value is an empty or whitespace-only string, or `null`.                   |

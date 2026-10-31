@@ -332,6 +332,23 @@ describe("cli", () => {
     expect(output).toContain(`fr (${join("public", "locales", "fr", "home.json")}): would translate 1 keys`);
   });
 
+  it("reports a key defined twice in one file via health", async () => {
+    const project = await createHealthyProject();
+    await writeFile(
+      join(project, "locales", "de.json"),
+      '{\n  "greeting": {\n    "hello": "Hallo"\n  },\n  "greeting.hello": "Servus"\n}\n'
+    );
+
+    const text = await runCli(project, "health");
+    const { stdout, code } = await runCliWithStatus(project, "health", "--json");
+
+    expect(text).toContain("duplicate de greeting.hello");
+    expect(code).toBe(1);
+    expect((JSON.parse(stdout) as { issues: unknown[] }).issues).toContainEqual(
+      expect.objectContaining({ type: "duplicate", locale: "de", key: "greeting.hello" })
+    );
+  });
+
   it("reports extra keys, empty values and type mismatches via health", async () => {
     const project = await mkdtemp(join(tmpdir(), "locale-keysmith-"));
     await mkdir(join(project, "locales"), { recursive: true });

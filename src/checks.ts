@@ -70,6 +70,21 @@ export function extraKeys(sourceKeys: string[], target: LocaleFile): string[] {
   });
 }
 
+/**
+ * Keys written more than once in a file. `{ "a.b": "x", "a": { "b": "y" } }` defines `a.b`
+ * twice, and i18next only ever reads one of the two values.
+ */
+export function duplicateKeys(file: LocaleFile): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  for (const key of flattenKeys(file.data)) {
+    (seen.has(key) ? duplicates : seen).add(key);
+  }
+
+  return [...duplicates];
+}
+
 /** Keys whose value is an empty or whitespace-only string, or null. */
 export function emptyValueKeys(file: LocaleFile): string[] {
   return leafEntries(file.data)

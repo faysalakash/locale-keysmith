@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  duplicateKeys,
   emptyValueKeys,
   expectedKeys,
   extraKeys,
@@ -84,6 +85,23 @@ describe("missingKeys / extraKeys", () => {
     const german = localeFile("de", { cart: { item_zero: "0", item_one: "1", item_other: "x" }, title: "t" });
 
     expect(extraKeys(englishKeys, german)).toEqual([]);
+  });
+});
+
+describe("duplicateKeys", () => {
+  it("finds a key written both as a dotted key and nested", () => {
+    const file = localeFile("en", {
+      "a.b": "x",
+      a: { b: "y", c: "z" },
+      "d.e": { f: "1" },
+      d: { "e.f": "2" }
+    });
+
+    expect(duplicateKeys(file)).toEqual(["a.b", "d.e.f"]);
+  });
+
+  it("reports nothing when every key is written once", () => {
+    expect(duplicateKeys(localeFile("en", { "a.b": "x", a: { c: "y" } }))).toEqual([]);
   });
 });
 

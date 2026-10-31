@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { join, relative } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
-import { emptyValueKeys, extraKeys, missingKeys, typeMismatches } from "@/checks";
+import { duplicateKeys, emptyValueKeys, extraKeys, missingKeys, typeMismatches } from "@/checks";
 import { CONFIG_FILENAME, loadConfig } from "@/config";
 import { detectConfig } from "@/init";
 import { deleteValueByPath, filterIgnoredKeys, flattenKeys, isSorted, sortObjectKeys } from "@/keys";
@@ -216,7 +216,7 @@ program
 program
   .command("health")
   .description(
-    "Report unsorted files, missing/extra/unused keys, empty values and type mismatches (exits non-zero on any issue)"
+    "Report unsorted files, duplicate/missing/extra/unused keys, empty values and type mismatches (exits non-zero on any issue)"
   )
   .option("--json", "Print the result as JSON")
   .action(async (options: { json?: boolean }) => {
@@ -422,7 +422,7 @@ function label(file: LocaleFile, groups: LocaleGroup[]): string {
   return groups.length > 1 ? `${file.locale} (${relativePath(file.path)})` : file.locale;
 }
 
-type IssueType = "unsorted" | "missing" | "extra" | "empty" | "type-mismatch" | "unused";
+type IssueType = "unsorted" | "duplicate" | "missing" | "extra" | "empty" | "type-mismatch" | "unused";
 
 interface Issue {
   type: IssueType;
@@ -439,6 +439,10 @@ function collectHealthIssues(groups: SourcedGroup[], config: LocaleLintConfig, u
   for (const file of groups.flatMap((group) => [group.source, ...group.targets])) {
     if (!isSorted(file.data)) {
       issues.push({ type: "unsorted", file });
+    }
+
+    for (const key of keep(duplicateKeys(file))) {
+      issues.push({ type: "duplicate", file, key });
     }
   }
 
