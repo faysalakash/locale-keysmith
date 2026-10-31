@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  vitest:
-    name: vitest (node ${{ matrix.node }})
+  test:
+    name: test (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,3 +34,16 @@ jobs:
           npm init -y > /dev/null
           npm install ./locale-keysmith-*.tgz
           npx locale-keysmith --version
+
+  # The single check the "Protect Main" ruleset requires. Its name stays `vitest` however the
+  # Node matrix changes. `always()` makes it report failure (not "skipped", which counts as
+  # passing) when any matrix job fails or is cancelled.
+  vitest:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Node version to pass
+        env:
+          RESULT: ${{ needs.test.result }}
+        run: test "$RESULT" = success
