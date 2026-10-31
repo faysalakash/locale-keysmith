@@ -349,6 +349,24 @@ describe("cli", () => {
     );
   });
 
+  it("keeps keys read through a useTranslation keyPrefix", async () => {
+    const project = await createHealthyProject();
+    await writeFile(
+      join(project, "locales", "en.json"),
+      '{\n  "greeting": {\n    "hello": "Hello"\n  },\n  "settings": {\n    "old": "Old",\n    "title": "Settings"\n  }\n}\n'
+    );
+    await writeFile(join(project, "locales", "de.json"), "{}\n");
+    await writeFile(
+      join(project, "src", "settings.ts"),
+      'const { t } = useTranslation("translation", { keyPrefix: "settings" });\nt("title");\n'
+    );
+
+    await runCli(project, "remove-unused", "--write");
+    const source = JSON.parse(await readFile(join(project, "locales", "en.json"), "utf8")) as unknown;
+
+    expect(source).toEqual({ greeting: { hello: "Hello" }, settings: { title: "Settings" } });
+  });
+
   it("counts a key defined twice in the source only once", async () => {
     const project = await createHealthyProject();
     await writeFile(

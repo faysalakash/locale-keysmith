@@ -23,6 +23,13 @@ const callPatterns = [
 // Any quoted string shaped like a dotted key path, wherever it appears.
 const keyLiteralPattern = new RegExp(`(["'\`])(${namespace}${segment}(?:\\.${segment})+)\\1`, "g");
 
+// `useTranslation("ns", { keyPrefix: "settings" })` / `withTranslation`, and
+// `i18next.getFixedT(lng, ns, "settings")`: the returned t reads `title` as `settings.title`.
+const keyPrefixPatterns = [
+  /\bkeyPrefix\s*:\s*(["'`])([^"'`\n]+)\1/g,
+  /\bgetFixedT\(\s*[^,()]*,\s*[^,()]*,\s*(["'`])([^"'`\n]+)\1/g
+];
+
 const prefixPatterns = [
   new RegExp(`\`(${namespace}(?:${segment}\\.)+)\\$\\{`, "g"), // `theme.${mode}`
   new RegExp(`(["'\`])(${namespace}(?:${segment}\\.)+)\\1\\s*\\+`, "g") // "theme." + mode
@@ -47,21 +54,29 @@ export function collectKeyUsage(
   content: string,
   usage: KeyUsage = { keys: new Set(), prefixes: new Set() }
 ): KeyUsage {
-  for (const pattern of callPatterns) {
-    for (const match of content.matchAll(pattern)) {
-      if (!match[2].includes("${")) {
-        addWithoutNamespace(usage.keys, match[2]);
-      }
+  const keyPrefixes = literalMatches(content, keyPrefixPatterns);
+  const record = (target: Set<string>, key: string): void => {
+    addWithoutNamespace(target, key);
+
+    // A keyPrefix is not tied to one particular t, so in a file that sets one, every key is
+    // recorded both as written and with each prefix. Erring towards "used" keeps
+    // remove-unused from deleting keys that are read through the prefixed t.
+    for (const keyPrefix of keyPrefixes) {
+      addWithoutNamespace(target, withKeyPrefix(key, keyPrefix));
     }
+  };
+
+  for (const key of literalMatches(content, callPatterns)) {
+    record(usage.keys, key);
   }
 
   for (const match of content.matchAll(keyLiteralPattern)) {
-    addWithoutNamespace(usage.keys, match[2]);
+    record(usage.keys, match[2]);
   }
 
   for (const pattern of prefixPatterns) {
     for (const match of content.matchAll(pattern)) {
-      addWithoutNamespace(usage.prefixes, match.at(-1) as string);
+      record(usage.prefixes, match.at(-1) as string);
     }
   }
 
@@ -100,6 +115,20 @@ export function isKeyUsed(key: string, usage: KeyUsage): boolean {
   }
 
   return false;
+}
+
+/** The string literals captured by `patterns`, skipping template literals with `${}` in them. */
+function literalMatches(content: string, patterns: RegExp[]): string[] {
+  return patterns.flatMap((pattern) =>
+    [...content.matchAll(pattern)].map((match) => match[2]).filter((value) => !value.includes("${"))
+  );
+}
+
+// `common:title` with keyPrefix `settings` reads `settings.title` in the `common` namespace.
+function withKeyPrefix(key: string, keyPrefix: string): string {
+  const separator = key.indexOf(":");
+
+  return `${key.slice(0, separator + 1)}${keyPrefix}.${key.slice(separator + 1)}`;
 }
 
 // `common:app.title` refers to `app.title` in the `common` namespace; record both forms.

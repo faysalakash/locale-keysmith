@@ -298,7 +298,14 @@ runtime:
 t("cart.item", { count }); // cart.item_one, cart.item_other, cart.item_zero, ... are used
 t("friend.greeting", { context }); // friend.greeting_male, friend.greeting_female, ... are used
 t("common:common.title"); // namespaced: common.title is used
+
+const { t } = useTranslation("translation", { keyPrefix: "settings" });
+t("title"); // keyPrefix: settings.title is used (also getFixedT(lng, ns, "settings"))
 ```
+
+In a file that sets a `keyPrefix`, every key is counted both with and without the prefix,
+since another `t` in the same file may not use it. A `keyPrefix` built at runtime cannot be
+resolved, so keep its keys out of `remove-unused` with `ignoreKeys`.
 
 A **dynamically built** key cannot be resolved statically, so every key under its static
 prefix is treated as used. That is never reported or removed:
