@@ -28,16 +28,12 @@ export function sortObjectKeys<T extends LocaleValue>(value: T): T {
   return value;
 }
 
+/**
+ * Every key path in the file, once each. `{ "a.b": "x", "a": { "b": "y" } }` writes `a.b`
+ * twice but i18next sees one key, so it is listed once (`duplicateKeys` reports it).
+ */
 export function flattenKeys(value: LocaleObject, prefix = ""): string[] {
-  return Object.entries(value).flatMap(([key, child]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
-
-    if (isPlainObject(child)) {
-      return flattenKeys(child, path);
-    }
-
-    return [path];
-  });
+  return [...new Set(keyPaths(value, prefix))];
 }
 
 export function filterIgnoredKeys(keys: string[], ignorePatterns: string[]): string[] {
@@ -143,6 +139,18 @@ function findKeyChain(value: LocaleObject, segments: string[]): string[] | undef
   }
 
   return undefined;
+}
+
+function keyPaths(value: LocaleObject, prefix: string): string[] {
+  return Object.entries(value).flatMap(([key, child]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+
+    if (isPlainObject(child)) {
+      return keyPaths(child, path);
+    }
+
+    return [path];
+  });
 }
 
 function isPlainObject(value: unknown): value is LocaleObject {

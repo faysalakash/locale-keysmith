@@ -51,6 +51,10 @@ describe("flattenKeys", () => {
       "common.save"
     ]);
   });
+
+  it("lists a key written both as a dotted key and nested only once", () => {
+    expect(flattenKeys({ "a.b": "x", a: { b: "y", c: "z" } })).toEqual(["a.b", "a.c"]);
+  });
 });
 
 describe("filterIgnoredKeys", () => {

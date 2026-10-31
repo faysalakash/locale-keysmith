@@ -7,7 +7,14 @@ import { Command } from "commander";
 import { duplicateKeys, emptyValueKeys, extraKeys, missingKeys, typeMismatches } from "@/checks";
 import { CONFIG_FILENAME, loadConfig } from "@/config";
 import { detectConfig } from "@/init";
-import { deleteValueByPath, filterIgnoredKeys, flattenKeys, isSorted, sortObjectKeys } from "@/keys";
+import {
+  deleteValueByPath,
+  filterIgnoredKeys,
+  flattenKeys,
+  getValueByPath,
+  isSorted,
+  sortObjectKeys
+} from "@/keys";
 import { readLocaleFile, writeLocaleFile } from "@/parser";
 import { localeFilePath, parseLocalePath } from "@/locale-path";
 import { groupLocaleFiles, loadLocaleFiles, scanTranslationFiles } from "@/scanner";
@@ -290,7 +297,10 @@ program
       // Only touch files that translate this source, never unrelated locale files.
       for (const file of [group.source, ...group.targets]) {
         for (const key of unused) {
-          deleteValueByPath(file.data, key);
+          // A key written twice (`"a.b"` and `a` → `b`) is removed in both places.
+          while (getValueByPath(file.data, key) !== undefined) {
+            deleteValueByPath(file.data, key);
+          }
         }
         file.data = sortObjectKeys(file.data);
 
