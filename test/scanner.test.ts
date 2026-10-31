@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CONFIG_FILENAME } from "@/config";
-import { findLocaleFiles, groupLocaleFiles, loadLocaleFiles } from "@/scanner";
+import { findLocaleFiles, groupLocaleFiles, loadLocaleFiles, scanTranslationFiles } from "@/scanner";
 import type { LocaleFile } from "@/types";
 
 async function tempProject(files: Record<string, string>): Promise<string> {
@@ -100,6 +100,34 @@ describe("findLocaleFiles", () => {
     const locales = (await loadLocaleFiles(root)).map((file) => file.locale).sort();
 
     expect(locales).toEqual(["de", "en"]);
+  });
+});
+
+describe("scanTranslationFiles", () => {
+  it("returns the matched files that are not locale files as skipped", async () => {
+    const root = await tempProject({
+      "src/locales/en.json": '{ "a": "1" }',
+      "src/locales/english.json": '{ "a": "1" }',
+      "src/data/config.json": '{ "apiUrl": "https://example.com" }'
+    });
+
+    const { localeFiles, skipped } = await scanTranslationFiles(root);
+    const relative = (paths: string[]): string[] => paths.map((path) => path.slice(root.length + 1)).sort();
+
+    expect(relative(localeFiles)).toEqual([join("src", "locales", "en.json")]);
+    expect(relative(skipped)).toEqual([
+      join("src", "data", "config.json"),
+      join("src", "locales", "english.json")
+    ]);
+  });
+
+  it("does not list the config file as skipped", async () => {
+    const root = await tempProject({
+      [CONFIG_FILENAME]: JSON.stringify({ roots: ["."] }),
+      "locales/en.json": '{ "a": "1" }'
+    });
+
+    expect((await scanTranslationFiles(root)).skipped).toEqual([]);
   });
 });
 
