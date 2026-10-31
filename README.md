@@ -1,34 +1,63 @@
 # locale-keysmith
 
-Sort, audit, clean, and translate i18n locale files from the command line.
+[![npm](https://img.shields.io/npm/v/locale-keysmith)](https://www.npmjs.com/package/locale-keysmith)
+[![Test](https://github.com/faysalakash/locale-keysmith/actions/workflows/test.yml/badge.svg)](https://github.com/faysalakash/locale-keysmith/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/npm/l/locale-keysmith)](LICENSE)
+
+Keep your i18n locale files complete and tidy, from the command line or in CI.
+
+locale-keysmith finds your locale files (JSON or YAML), compares every translation with the
+source language, and checks which keys your code still uses. It can then sort the files,
+delete unused keys, and fill in missing translations with Google Translate.
+
+- **Audit:** one `health` command reports missing, extra, unused, duplicate and empty keys,
+  type mismatches and unsorted files.
+- **Clean up:** `sort` and `remove-unused` rewrite files while keeping their indentation, line
+  endings and YAML comments.
+- **Translate:** fill missing keys via Google Translate, with `{{placeholders}}`, ICU messages
+  and `<0>tags</0>` kept intact.
+- **CI-ready:** `--json` output, and exit codes that tell "issues found" apart from "the check
+  itself failed".
+- **Zero config:** works out of the box for a `src` folder; `init` writes a config for
+  anything else.
+
+## Works with
+
+locale-keysmith is built around **i18next** conventions, as used by react-i18next,
+next-i18next and i18next-http-backend: plural suffixes (`_one`, `_other`, ...), context,
+namespaces and `keyPrefix` are all understood.
+
+Other libraries that keep translations in JSON/YAML key files and read them with `t("key")`
+or `$t("key")` (vue-i18n, for example) work for the key checks, but plural forms are checked
+by i18next's rules.
 
 ## Install
 
 ```bash
-pnpm add -D locale-keysmith
+npm install --save-dev locale-keysmith
+# or: pnpm add -D locale-keysmith
+# or: yarn add -D locale-keysmith
 ```
+
+Or run it without installing anything: `npx locale-keysmith health`.
 
 Requires Node.js 22.12 or newer.
 
 ## Quick start
 
 ```bash
-# Write a starter config based on the locale files in your project (optional)
-pnpm exec locale-keysmith init
-
-# See which locale files are detected
-pnpm exec locale-keysmith scan
-
-# Get a full report: missing keys, unused keys, and unsorted files
-pnpm exec locale-keysmith health
+npx locale-keysmith init     # optional: write a config based on the locale files found
+npx locale-keysmith scan     # see which locale files are detected
+npx locale-keysmith health   # report everything that needs attention
 ```
 
-By default everything is scanned under the `src` folder. To look elsewhere, add a config
-file (see [Configuration](#configuration)).
+By default everything is scanned under the `src` folder. To look elsewhere, run `init` or add
+a config file (see [Configuration](#configuration)).
 
 ## Commands
 
-Run a command with `pnpm exec locale-keysmith <command>` (or `npx locale-keysmith <command>`).
+The examples use `npx locale-keysmith <command>`; with pnpm or yarn, `pnpm exec` or `yarn`
+work the same way.
 
 | Command                    | What it does                                                             |
 | -------------------------- | ------------------------------------------------------------------------ |
@@ -41,36 +70,11 @@ Run a command with `pnpm exec locale-keysmith <command>` (or `npx locale-keysmit
 | `remove-unused`            | Delete unused keys from every locale file.                               |
 | `translate --to <locales>` | Fill missing keys in target locales via Google Translate.                |
 
-### Using it in CI
-
-`scan`, `missing`, `unused` and `health` accept `--json` and print a machine-readable
-result on stdout (warnings go to stderr, so stdout always parses):
-
-```bash
-pnpm exec locale-keysmith health --json
-```
-
-```json
-{
-  "healthy": false,
-  "issueCount": 1,
-  "issues": [{ "type": "missing", "file": "src/locales/de.json", "locale": "de", "key": "status.offline" }]
-}
-```
-
-Exit codes:
-
-| Code | Meaning                                                                           |
-| ---- | --------------------------------------------------------------------------------- |
-| `0`  | Nothing to report.                                                                |
-| `1`  | `missing`, `unused` or `health` found something.                                  |
-| `2`  | The command itself failed (invalid config, unreadable locale file, API error...). |
-
 ### `init`
 
 ```bash
-pnpm exec locale-keysmith init           # refuses to overwrite an existing config
-pnpm exec locale-keysmith init --force   # overwrite it
+npx locale-keysmith init           # refuses to overwrite an existing config
+npx locale-keysmith init --force   # overwrite it
 ```
 
 Looks for locale files in the project (skipping `node_modules`, build output, and test or
@@ -84,14 +88,14 @@ fixture folders) and writes a config with:
 ### `scan`
 
 ```bash
-pnpm exec locale-keysmith scan
+npx locale-keysmith scan
 ```
 
-Prints one line per detected locale file, e.g. `en  src/locales/en.json`. Matched JSON/YAML
-files that are not locale files (see [How locale files are recognised](#how-locale-files-are-recognised))
-are listed underneath as skipped, so you can see why a file you expected is missing:
+Prints one line per detected locale file. Matched JSON/YAML files that are not locale files
+(see [How locale files are recognised](#how-locale-files-are-recognised)) are listed
+underneath as skipped, so you can see why a file you expected is missing:
 
-```
+```text
 en src/locales/en.json
 de src/locales/de.json
 
@@ -104,12 +108,12 @@ With `--json`, the skipped files are in the `skipped` array.
 ### `health`
 
 ```bash
-pnpm exec locale-keysmith health
+npx locale-keysmith health
 ```
 
 A one-shot audit. It prints each problem it finds:
 
-```
+```text
 unsorted src/locales/de.json
 duplicate en nav.home
 missing de status.offline
@@ -138,7 +142,7 @@ are skipped by every check.
 ### `missing`
 
 ```bash
-pnpm exec locale-keysmith missing
+npx locale-keysmith missing
 ```
 
 Lists, per non-source locale, the keys that exist in the source locale but are absent.
@@ -151,7 +155,7 @@ Japanese only needs `item_other`. Neither is reported as missing or extra for do
 ### `unused`
 
 ```bash
-pnpm exec locale-keysmith unused
+npx locale-keysmith unused
 ```
 
 Lists source-locale keys that are never referenced in your source files. See
@@ -160,8 +164,8 @@ Lists source-locale keys that are never referenced in your source files. See
 ### `sort`
 
 ```bash
-pnpm exec locale-keysmith sort           # preview (no changes written)
-pnpm exec locale-keysmith sort --write   # write sorted files to disk
+npx locale-keysmith sort           # preview (no changes written)
+npx locale-keysmith sort --write   # write sorted files to disk
 ```
 
 Sorts keys alphabetically at every nesting level. Without `--write` it only reports which
@@ -170,20 +174,24 @@ files would change.
 ### `remove-unused`
 
 ```bash
-pnpm exec locale-keysmith remove-unused              # preview
-pnpm exec locale-keysmith remove-unused --dry-run    # preview (explicit)
-pnpm exec locale-keysmith remove-unused --write      # delete unused keys and re-sort
+npx locale-keysmith remove-unused              # preview
+npx locale-keysmith remove-unused --dry-run    # preview (explicit)
+npx locale-keysmith remove-unused --write      # delete unused keys and re-sort
 ```
 
 Removes unused keys from **every** locale file (not just the source), then re-sorts them.
 It lists every key it removes; without `--write` it only lists the keys that would be removed.
 
+> **Warning:** `--write` deletes translations. Commit your work first and read the list it prints: a key
+> that your code builds entirely at runtime cannot be detected (see
+> [Key usage detection](#key-usage-detection)). Protect such keys with `ignoreKeys`.
+
 ### `translate`
 
 ```bash
 export GOOGLE_TRANSLATE_API_KEY="your-api-key"
-pnpm exec locale-keysmith translate --to de,fr           # preview counts
-pnpm exec locale-keysmith translate --from en --to de,fr --write
+npx locale-keysmith translate --to de,fr           # preview counts
+npx locale-keysmith translate --from en --to de,fr --write
 ```
 
 Translates the source locale's missing keys into each target locale using the Google
@@ -206,6 +214,65 @@ never in the URL.
 - **Progress is saved.** If a request fails midway, the keys translated so far are written
   before the error is reported, so rerunning only translates what is left.
 - Keys are sent in batches of up to 100 strings per request.
+
+#### Getting an API key
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create or select a
+   project. It needs a billing account.
+2. Enable the **Cloud Translation API** (APIs & Services → Library).
+3. Create a key under APIs & Services → Credentials → **Create credentials → API key**.
+4. Restrict the key to the Cloud Translation API, then export it as `GOOGLE_TRANSLATE_API_KEY`.
+
+Google charges per translated character, with a monthly free allowance; see
+[Cloud Translation pricing](https://cloud.google.com/translate/pricing). Run without
+`--write` first to see how many keys would be sent.
+
+## Using it in CI
+
+`health` fails the job when it finds anything, which makes it a one-line CI check:
+
+```yaml
+# .github/workflows/i18n.yml
+name: i18n
+on: pull_request
+
+jobs:
+  locales:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npx --yes locale-keysmith@0 health
+```
+
+If locale-keysmith is a dev dependency, run your install step (`npm ci`) and then
+`npx locale-keysmith health`, so CI uses the version in your lockfile. To check only for
+missing translations, use `missing` instead of `health`.
+
+Exit codes:
+
+| Code | Meaning                                                                           |
+| ---- | --------------------------------------------------------------------------------- |
+| `0`  | Nothing to report.                                                                |
+| `1`  | `missing`, `unused` or `health` found something.                                  |
+| `2`  | The command itself failed (invalid config, unreadable locale file, API error...). |
+
+`scan`, `missing`, `unused` and `health` accept `--json` and print a machine-readable
+result on stdout (warnings go to stderr, so stdout always parses):
+
+```bash
+npx locale-keysmith health --json
+```
+
+```json
+{
+  "healthy": false,
+  "issueCount": 1,
+  "issues": [{ "type": "missing", "file": "src/locales/de.json", "locale": "de", "key": "status.offline" }]
+}
+```
 
 ## Configuration
 
@@ -315,20 +382,14 @@ t(`theme.${mode}`); // every key under theme. (theme.dark, theme.light, ...) is 
 t("errors." + code); // every key under errors. is used
 ```
 
-## Development
+A key computed entirely at runtime (`t(keyFromServer)`) leaves no trace in the source, so it
+is reported as unused. Add such keys to `ignoreKeys`.
 
-```bash
-pnpm run lint        # ESLint (typescript-eslint, flat config)
-pnpm run format      # Prettier --write
-pnpm run test        # Vitest
-pnpm run coverage    # Vitest with v8 coverage
-pnpm run check       # lint + format:check + build + test
-```
+## Contributing
 
-`pnpm run test` never calls Google Translate. To check `translate` against the real API
-(placeholders, HTML entities, batching, error messages), run the live tests with a key. A
-full run sends about 2,000 characters:
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+development setup.
 
-```bash
-GOOGLE_TRANSLATE_API_KEY="your-api-key" pnpm run test:live
-```
+## License
+
+[MIT](LICENSE) © Faysal Ahmed Akash
