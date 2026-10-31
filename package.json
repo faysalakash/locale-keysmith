@@ -23,7 +23,7 @@
     "build": "tsc && tsc-alias --resolve-full-paths",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:live": "LIVE_TRANSLATE=1 vitest run test/translate.live.test.ts",
+    "test:live": "vitest run --mode live test/translate.live.test.ts",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -39,7 +39,7 @@
     "translation",
     "cli"
   ],
-  "author": "",
+  "author": "Faysal Ahmed Akash",
   "license": "MIT",
   "repository": {
     "type": "git",
