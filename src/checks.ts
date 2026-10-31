@@ -78,7 +78,7 @@ export function duplicateKeys(file: LocaleFile): string[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
 
-  for (const key of flattenKeys(file.data)) {
+  for (const [key] of leafEntries(file.data)) {
     (seen.has(key) ? duplicates : seen).add(key);
   }
 

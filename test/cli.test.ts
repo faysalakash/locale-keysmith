@@ -349,6 +349,24 @@ describe("cli", () => {
     );
   });
 
+  it("counts a key defined twice in the source only once", async () => {
+    const project = await createHealthyProject();
+    await writeFile(
+      join(project, "locales", "en.json"),
+      '{\n  "greeting": {\n    "hello": "Hello"\n  },\n  "greeting.hello": "Hi",\n  "old": {\n    "x": "a"\n  },\n  "old.x": "b"\n}\n'
+    );
+    await writeFile(join(project, "locales", "de.json"), "{}\n");
+
+    const missing = await runCli(project, "missing");
+    await runCli(project, "remove-unused", "--write");
+    const source = JSON.parse(await readFile(join(project, "locales", "en.json"), "utf8")) as unknown;
+
+    expect(missing.match(/greeting\.hello/g)).toHaveLength(1);
+    expect(missing.match(/old\.x/g)).toHaveLength(1);
+    // Both copies of the unused key are removed.
+    expect(source).toEqual({ greeting: { hello: "Hello" }, "greeting.hello": "Hi" });
+  });
+
   it("reports extra keys, empty values and type mismatches via health", async () => {
     const project = await mkdtemp(join(tmpdir(), "locale-keysmith-"));
     await mkdir(join(project, "locales"), { recursive: true });
